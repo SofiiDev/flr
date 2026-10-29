@@ -656,7 +656,7 @@ function appearance() {
       h("div", { class: "swatches", role: "radiogroup", "aria-labelledby": "accentLabel" },
         ACCENTS.map((a) => {
           const [name, light, dark] = ACCENT_INFO[a];
-          return h("label", { class: "swatch", style: `--sw: light-dark(${light}, ${dark})` },
+          return h("label", { class: "swatch", style: `--sw-l: ${light}; --sw-d: ${dark}` },
             h("input", { type: "radio", name: "accent", value: a, checked: a === cur.accent }),
             h("span", {}, h("i"), name));
         }))),

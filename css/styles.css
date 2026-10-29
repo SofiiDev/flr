@@ -8,41 +8,42 @@
    ============================================================ */
 
 :root {
-  /* Modo: sigue al sistema salvo que la usuaria elija Claro u Oscuro
-     (atributo data-mode en <html>). Cada color es light-dark(claro, oscuro). */
+  /* Colores del modo claro. El modo oscuro los redefine más abajo: cuando la
+     usuaria elige Oscuro (data-mode="dark" en <html>) o cuando elige Sistema
+     y el móvil está en oscuro. */
   color-scheme: light dark;
 
-  --bg: light-dark(#F4F4F6, #0C0B0E);           /* neutros con un leve tinte cálido */
-  --surface: light-dark(#FFFFFF, #17151A);
-  --surface-2: light-dark(#F1F0F3, #211F25);
-  --line: light-dark(#E5E3E8, #2C2930);
-  --text: light-dark(#121014, #F4F2F6);
-  --text-2: light-dark(#55505C, #BDB7C4);       /* 7.6:1 / 9.6:1 sobre --surface */
-  --text-3: light-dark(#6F6977, #958F9D);       /* 5.1:1 / 5.9:1 */
+  --bg: #F4F4F6;           /* neutros con un leve tinte cálido */
+  --surface: #FFFFFF;
+  --surface-2: #F1F0F3;
+  --line: #E5E3E8;
+  --text: #121014;
+  --text-2: #55505C;       /* 7.6:1 / 9.6:1 sobre --surface */
+  --text-3: #6F6977;       /* 5.1:1 / 5.9:1 */
   --brand: #D6336C;                             /* rosa del logo: bloque de marca del login */
   --brand-ink: #FFFFFF;
-  --run: light-dark(#E0570F, #FF8A4C);          /* naranja: correr */
-  --protein: light-dark(#C2410C, #FB923C);
-  --carbs: light-dark(#1D4ED8, #7CA2FF);
-  --fat: light-dark(#A16207, #E8B949);
-  --sleep: light-dark(#6D4AD8, #A98CFF);
-  --ok: light-dark(#15803D, #4ADE80);
-  --danger: light-dark(#C62828, #FF6B6B);
-  --body: light-dark(#00917E, #2FC2AE);         /* verde azulado: cuerpo */
-  --shadow: 0 1px 2px light-dark(rgba(18, 16, 20, .04), transparent), 0 2px 8px light-dark(rgba(18, 16, 20, .04), transparent);
-  --shadow-float: 0 8px 24px light-dark(rgba(18, 16, 20, .14), rgba(0, 0, 0, .5));
+  --run: #E0570F;          /* naranja: correr */
+  --protein: #C2410C;
+  --carbs: #1D4ED8;
+  --fat: #A16207;
+  --sleep: #6D4AD8;
+  --ok: #15803D;
+  --danger: #C62828;
+  --body: #00917E;         /* verde azulado: cuerpo */
+  --shadow: 0 1px 2px rgba(18, 16, 20, .04), 0 2px 8px rgba(18, 16, 20, .04);
+  --shadow-float: 0 8px 24px rgba(18, 16, 20, .14);
   /* series de gráficos (validadas: claro sobre #FFF, oscuro sobre #17151A); una serie por gráfico */
-  --chart-run: light-dark(#E0570F, #E8682A);
-  --chart-kcal: light-dark(#2F5FE3, #5B7DE8);
-  --chart-body: light-dark(#00917E, #13A08E);
-  --chart-fat: light-dark(#00917E, #13A08E);
-  --chart-sleep: light-dark(#6D4AD8, #8A6AE8);
+  --chart-run: #E0570F;
+  --chart-kcal: #2F5FE3;
+  --chart-body: #00917E;
+  --chart-fat: #00917E;
+  --chart-sleep: #6D4AD8;
 
   /* color de acento: lo elige cada perfil (data-accent); por defecto, rosa.
      Todos cumplen 4.5:1 como texto sobre --surface y --bg, y con --accent-ink encima. */
-  --accent: light-dark(#CC2D66, #FF7AA2);
-  --accent-soft: light-dark(#FCE8EF, #3A1D29);
-  --accent-ink: light-dark(#FFFFFF, #0C0B0E);
+  --accent: #CC2D66;
+  --accent-soft: #FCE8EF;
+  --accent-ink: #FFFFFF;
 
   /* tipografía */
   --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
@@ -62,13 +63,89 @@
   --tabbar-h: 68px;
 }
 :root[data-mode="light"] { color-scheme: light; }
-:root[data-mode="dark"] { color-scheme: dark; }
 
-:root[data-accent="violeta"] { --accent: light-dark(#6D4AD8, #A78BFA); --accent-soft: light-dark(#EFEBFE, #2A2240); }
-:root[data-accent="azul"] { --accent: light-dark(#1F5FD6, #7AA2FF); --accent-soft: light-dark(#E7EEFE, #1D2840); }
-:root[data-accent="turquesa"] { --accent: light-dark(#0B7A75, #3CC9BF); --accent-soft: light-dark(#E0F4F2, #15302E); }
-:root[data-accent="verde"] { --accent: light-dark(#2E7D32, #6BCB77); --accent-soft: light-dark(#E6F3E6, #1B2E1D); }
-:root[data-accent="grafito"] { --accent: light-dark(#3F3A45, #D4CFDA); --accent-soft: light-dark(#ECEAEF, #2C2930); }
+/* acentos que elige cada perfil (data-accent); por defecto, rosa */
+:root[data-accent="violeta"] { --accent: #6D4AD8; --accent-soft: #EFEBFE; }
+:root[data-accent="azul"] { --accent: #1F5FD6; --accent-soft: #E7EEFE; }
+:root[data-accent="turquesa"] { --accent: #0B7A75; --accent-soft: #E0F4F2; }
+:root[data-accent="verde"] { --accent: #2E7D32; --accent-soft: #E6F3E6; }
+:root[data-accent="grafito"] { --accent: #3F3A45; --accent-soft: #ECEAEF; }
+
+/* ---------- modo oscuro ----------
+   Se escribe dos veces a propósito: una para "Oscuro" elegido en Ajustes y
+   otra para "Sistema" con el móvil en oscuro. Así funciona en cualquier
+   navegador, sin depender de funciones CSS recientes. */
+:root[data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #0C0B0E;
+  --surface: #17151A;
+  --surface-2: #211F25;
+  --line: #2C2930;
+  --text: #F4F2F6;
+  --text-2: #BDB7C4;
+  --text-3: #958F9D;
+  --run: #FF8A4C;
+  --protein: #FB923C;
+  --carbs: #7CA2FF;
+  --fat: #E8B949;
+  --sleep: #A98CFF;
+  --ok: #4ADE80;
+  --danger: #FF6B6B;
+  --body: #2FC2AE;
+  --chart-run: #E8682A;
+  --chart-kcal: #5B7DE8;
+  --chart-body: #13A08E;
+  --chart-fat: #13A08E;
+  --chart-sleep: #8A6AE8;
+  --accent: #FF7AA2;
+  --accent-soft: #3A1D29;
+  --accent-ink: #0C0B0E;
+  --shadow: none;
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, .5);
+}
+:root[data-mode="dark"][data-accent="violeta"] { --accent: #A78BFA; --accent-soft: #2A2240; }
+:root[data-mode="dark"][data-accent="azul"] { --accent: #7AA2FF; --accent-soft: #1D2840; }
+:root[data-mode="dark"][data-accent="turquesa"] { --accent: #3CC9BF; --accent-soft: #15302E; }
+:root[data-mode="dark"][data-accent="verde"] { --accent: #6BCB77; --accent-soft: #1B2E1D; }
+:root[data-mode="dark"][data-accent="grafito"] { --accent: #D4CFDA; --accent-soft: #2C2930; }
+:root[data-mode="dark"] .swatch { --sw: var(--sw-d); }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode="light"]) {
+    color-scheme: dark;
+    --bg: #0C0B0E;
+    --surface: #17151A;
+    --surface-2: #211F25;
+    --line: #2C2930;
+    --text: #F4F2F6;
+    --text-2: #BDB7C4;
+    --text-3: #958F9D;
+    --run: #FF8A4C;
+    --protein: #FB923C;
+    --carbs: #7CA2FF;
+    --fat: #E8B949;
+    --sleep: #A98CFF;
+    --ok: #4ADE80;
+    --danger: #FF6B6B;
+    --body: #2FC2AE;
+    --chart-run: #E8682A;
+    --chart-kcal: #5B7DE8;
+    --chart-body: #13A08E;
+    --chart-fat: #13A08E;
+    --chart-sleep: #8A6AE8;
+    --accent: #FF7AA2;
+    --accent-soft: #3A1D29;
+    --accent-ink: #0C0B0E;
+    --shadow: none;
+    --shadow-float: 0 8px 24px rgba(0, 0, 0, .5);
+  }
+  :root:not([data-mode="light"])[data-accent="violeta"] { --accent: #A78BFA; --accent-soft: #2A2240; }
+  :root:not([data-mode="light"])[data-accent="azul"] { --accent: #7AA2FF; --accent-soft: #1D2840; }
+  :root:not([data-mode="light"])[data-accent="turquesa"] { --accent: #3CC9BF; --accent-soft: #15302E; }
+  :root:not([data-mode="light"])[data-accent="verde"] { --accent: #6BCB77; --accent-soft: #1B2E1D; }
+  :root:not([data-mode="light"])[data-accent="grafito"] { --accent: #D4CFDA; --accent-soft: #2C2930; }
+  :root:not([data-mode="light"]) .swatch { --sw: var(--sw-d); }
+}
 
 * { box-sizing: border-box; }
 
@@ -511,7 +588,7 @@ body.signed-out { padding-bottom: 0; }
 
 /* ---------- apariencia: colores y modo ---------- */
 .swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
-.swatch { position: relative; }
+.swatch { position: relative; --sw: var(--sw-l); }
 .swatch input { position: absolute; opacity: 0; inset: 0; min-height: 0; margin: 0; }
 .swatch span {
   display: flex; align-items: center; gap: var(--s2); min-height: var(--tap); padding: 0 var(--s3);
