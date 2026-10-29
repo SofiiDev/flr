@@ -43,6 +43,8 @@ create table if not exists public.profiles (
 -- altura para calcular el IMC (añadida después: idempotente)
 alter table public.profiles add column if not exists height_cm numeric(5,1)
   check (height_cm is null or height_cm between 100 and 250);
+-- apariencia elegida por cada perfil: { "accent": "rosa", "mode": "system" }
+alter table public.profiles add column if not exists prefs jsonb not null default '{}';
 
 -- Al crear una cuenta: rechazar emails no permitidos y crear su perfil.
 create or replace function public.handle_new_user()
@@ -178,7 +180,7 @@ create policy "perfil propio: editar" on public.profiles
 
 -- Las usuarias no pueden cambiar su email, nombre ni vínculo de Strava desde el navegador.
 revoke update on public.profiles from anon, authenticated;
-grant update (goals, height_cm) on public.profiles to authenticated;
+grant update (goals, height_cm, prefs) on public.profiles to authenticated;
 
 do $$
 declare t text;

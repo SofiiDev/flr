@@ -166,6 +166,20 @@ export function setGoals(goals) {
   enqueue(async () => must(await sb.from("profiles").update({ goals: db.goals }).eq("id", account.user.id)));
 }
 
+export const ACCENTS = ["rosa", "violeta", "azul", "turquesa", "verde", "grafito"];
+export const MODES = ["system", "light", "dark"];
+export const cleanPrefs = (p = {}) => ({
+  accent: ACCENTS.includes(p?.accent) ? p.accent : "rosa",
+  mode: MODES.includes(p?.mode) ? p.mode : "system",
+});
+
+/** Guarda la apariencia (color y modo) del perfil. */
+export function setPrefs(prefs) {
+  const v = cleanPrefs(prefs);
+  account.profile.prefs = v;
+  enqueue(async () => must(await sb.from("profiles").update({ prefs: v }).eq("id", account.user.id)));
+}
+
 /** Guarda la altura (cm) para calcular el IMC. */
 export function setHeight(cm) {
   const v = num(cm, 100, 250);

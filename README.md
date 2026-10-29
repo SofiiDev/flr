@@ -11,7 +11,7 @@ App móvil privada (PWA instalable) para **Sofi y Flor**: carreras, comidas, rec
 - **Recetas**: ingredientes con cantidades; la IA calcula los macros totales y por porción. **Las recetas son compartidas** entre Sofi y Flor.
 - **Cuerpo**: peso, grasa corporal (%) e **IMC** calculado con tu altura (categorías de la OMS), con gráficos de 90 días, cambio en 30 días y distancia al peso objetivo. Incluye la pestaña de **Sueño**: horas, calidad, media de 7 días y déficit.
 - **Resumen**: todo consolidado por periodo (4 semanas, 3 meses, 12 meses o todo el historial): km, ritmo medio, calorías y proteína medias por día, sueño medio, peso, IMC y grasa con su variación; gráficos de km por semana o mes, peso, grasa, calorías y sueño frente a tus objetivos; **récords** (carrera más larga, mejor ritmo en 5 km o más, mejor semana y mejor mes) y una tabla **mes a mes**.
-- **Ajustes**: objetivos (incluido peso objetivo y altura), conexión con Strava, exportar/importar copia, borrar registros y cerrar sesión.
+- **Ajustes**: apariencia de cada perfil (color de acento: rosa, violeta, azul, turquesa, verde o grafito; modo Sistema, Claro u Oscuro), objetivos (incluido peso objetivo y altura), conexión con Strava, exportar/importar copia, borrar registros y cerrar sesión.
 
 Pestañas: Hoy · Correr · Comidas (Diario / Recetas) · Cuerpo (Peso y grasa / Sueño) · Resumen.
 

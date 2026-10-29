@@ -2,7 +2,7 @@
    Vistas: Hoy · Correr · Comidas · Recetas · Sueño (+ Ajustes).
    Todo el contenido del usuario se inserta como texto (nunca HTML). */
 
-import { sb, db, account, loadAll, upsert, remove, setGoals, setHeight, exportJSON, importJSON, wipe, uid, flush, onWriteError } from "./store.js";
+import { sb, db, account, loadAll, upsert, remove, setGoals, setHeight, setPrefs, cleanPrefs, ACCENTS, exportJSON, importJSON, wipe, uid, flush, onWriteError } from "./store.js";
 import { barChart, lineChart } from "./charts.js";
 
 /* ============ utilidades ============ */
@@ -81,6 +81,41 @@ const fmtHours = (hrs) => { const m = Math.round(hrs * 60); return `${Math.floor
 const kcalFromMacros = (p, c, f) => Math.round(p * 4 + c * 4 + f * 9);
 const sum = (arr, k) => arr.reduce((a, x) => a + (x[k] || 0), 0);
 const byDateDesc = (a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || ""));
+
+/* ============ apariencia: color de acento y modo ============ */
+
+// nombre visible y muestra (claro, oscuro) de cada acento; los valores reales viven en styles.css
+const ACCENT_INFO = {
+  rosa: ["Rosa", "#CC2D66", "#FF7AA2"],
+  violeta: ["Violeta", "#6D4AD8", "#A78BFA"],
+  azul: ["Azul", "#1F5FD6", "#7AA2FF"],
+  turquesa: ["Turquesa", "#0B7A75", "#3CC9BF"],
+  verde: ["Verde", "#2E7D32", "#6BCB77"],
+  grafito: ["Grafito", "#3F3A45", "#D4CFDA"],
+};
+const MODE_OPTIONS = [["system", "Sistema"], ["light", "Claro"], ["dark", "Oscuro"]];
+const PREFS_KEY = "flr:prefs";
+
+function applyPrefs(prefs) {
+  const p = cleanPrefs(prefs);
+  const root = document.documentElement;
+  root.dataset.accent = p.accent;
+  if (p.mode === "system") delete root.dataset.mode;
+  else root.dataset.mode = p.mode;
+  // la barra del sistema del móvil sigue al fondo de la app
+  const bg = getComputedStyle(document.body).backgroundColor;
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => { m.content = bg; });
+  // recordada en este dispositivo para pintar bien antes de cargar el perfil
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch { /* sin almacenamiento */ }
+  return p;
+}
+
+let cachedPrefs = {};
+try { cachedPrefs = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); } catch { /* sin almacenamiento */ }
+applyPrefs(cachedPrefs);
+
+// si el modo sigue al sistema, la barra del móvil también debe cambiar con él
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => applyPrefs(account.profile?.prefs ?? cachedPrefs));
 
 /* ============ toast + hoja inferior ============ */
 
@@ -608,6 +643,9 @@ function settingsSheet() {
       h("div", { class: "item-main" }, h("strong", {}, prof?.name || ""), h("p", { class: "muted" }, prof?.email || "")),
       h("button", { type: "button", class: "btn ghost", icon: "logout", onclick: signOut }, "Salir")),
 
+    h("h3", { class: "section-title" }, "Apariencia"),
+    appearance(),
+
     h("h3", { class: "section-title" }, "Garmin y Strava"),
     strava,
 
@@ -633,6 +671,30 @@ function settingsSheet() {
       "Las estimaciones de la IA son aproximadas: revísalas y ajústalas si conoces los valores exactos de la etiqueta."),
   );
   openSheet("Ajustes", form);
+}
+
+/** Color de acento y modo de este perfil; se aplica y guarda al momento. */
+function appearance() {
+  const cur = cleanPrefs(account.profile?.prefs);
+  const box = h("div", {},
+    h("div", { class: "field" },
+      h("span", { class: "label", id: "accentLabel" }, "Color"),
+      h("div", { class: "swatches", role: "radiogroup", "aria-labelledby": "accentLabel" },
+        ACCENTS.map((a) => {
+          const [name, light, dark] = ACCENT_INFO[a];
+          return h("label", { class: "swatch", style: `--sw: light-dark(${light}, ${dark})` },
+            h("input", { type: "radio", name: "accent", value: a, checked: a === cur.accent }),
+            h("span", {}, h("i"), name));
+        }))),
+    h("div", { class: "field" },
+      h("span", { class: "label" }, "Modo"),
+      segmented("mode", MODE_OPTIONS, cur.mode, "Modo de color")));
+  box.addEventListener("change", () => {
+    const p = { accent: box.querySelector('input[name="accent"]:checked')?.value, mode: box.querySelector('input[name="mode"]:checked')?.value };
+    setPrefs(applyPrefs(p));
+    render();   // los anillos y gráficos toman el color nuevo
+  });
+  return box;
 }
 
 function downloadBackup() {
@@ -1370,6 +1432,7 @@ async function startApp(user) {
     renderLogin("denied");
     return;
   }
+  applyPrefs(account.profile.prefs);
   setChrome(true);
   go(location.hash.slice(1) || "today");
   const prof = account.profile;
