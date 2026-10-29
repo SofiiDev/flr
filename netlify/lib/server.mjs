@@ -46,6 +46,29 @@ export function sameOrigin(req) {
   return !origin || new URL(origin).host === new URL(req.url).host;
 }
 
+/** Traduce los fallos típicos de configuración de Supabase a un mensaje que diga qué arreglar. */
+export function explainDbError(err) {
+  const code = err?.code || "";
+  const msg = `${err?.message || ""} ${err?.details || ""} ${err?.hint || ""}`;
+  if (code === "42P01" || code === "PGRST205" || /does not exist|schema cache/i.test(msg)) {
+    return "Faltan las tablas en Supabase: ejecuta supabase/schema.sql en el SQL Editor.";
+  }
+  if (code === "42501" || /permission denied/i.test(msg)) {
+    return "Supabase rechaza la clave: SUPABASE_SERVICE_ROLE_KEY debe ser la clave service_role (o secret), no la anon/publishable.";
+  }
+  if (/invalid api key|jwt|unregistered api key|no api key/i.test(msg)) {
+    return "SUPABASE_SERVICE_ROLE_KEY no es válida: cópiala de nuevo desde Supabase (Project Settings → API).";
+  }
+  if (code === "22P02" || code === "42703" || /column .* does not exist|invalid input syntax for type uuid/i.test(msg)) {
+    return "La base de datos tiene una versión anterior del esquema: vuelve a ejecutar supabase/schema.sql.";
+  }
+  if (code === "PGRST116") return "Faltan los perfiles en Supabase: vuelve a ejecutar supabase/schema.sql.";
+  if (/fetch failed|ENOTFOUND|getaddrinfo|Invalid URL/i.test(msg) || err instanceof TypeError) {
+    return "No se encuentra Supabase: revisa SUPABASE_URL (debe ser https://xxxx.supabase.co).";
+  }
+  return null;
+}
+
 /* ---------- tokens firmados (sin base de datos) ---------- */
 
 const b64 = (buf) => Buffer.from(buf).toString("base64url");

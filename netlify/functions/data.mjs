@@ -8,7 +8,7 @@
      wipe                         → borra carreras, comidas, sueño y mediciones del perfil
    El perfil sale siempre del token de sesión, nunca del cuerpo de la petición. */
 
-import { json, sameOrigin, sessionProfile, supabaseAdmin, ConfigError } from "../lib/server.mjs";
+import { json, sameOrigin, sessionProfile, supabaseAdmin, explainDbError, ConfigError } from "../lib/server.mjs";
 
 // columnas que el navegador puede escribir en cada tabla
 const COLUMNS = {
@@ -98,10 +98,10 @@ export default async (req) => {
     if (err instanceof Forbidden) return json({ error: err.message }, 403);
     if (err instanceof ConfigError) {
       console.error(err.message);
-      return json({ error: "Falta configurar la base de datos en Netlify." }, 503);
+      return json({ error: `Falta configurar la app en Netlify: ${err.variable}.` }, 503);
     }
     console.error(err);
-    return json({ error: "No se pudo guardar. Inténtalo de nuevo." }, 500);
+    return json({ error: explainDbError(err) || "No se pudo guardar. Inténtalo de nuevo." }, 500);
   }
 };
 

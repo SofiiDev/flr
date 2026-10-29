@@ -4,7 +4,7 @@
    Las actividades de Garmin llegan a Strava solas; aquí se importan
    solo las de tipo carrera y nunca se pisan las ya importadas. */
 
-import { json, sessionProfile, sameOrigin, supabaseAdmin, stravaAccessToken, ConfigError } from "../lib/server.mjs";
+import { json, sessionProfile, sameOrigin, supabaseAdmin, stravaAccessToken, explainDbError, ConfigError } from "../lib/server.mjs";
 
 const RUN_TYPES = new Set(["Run", "TrailRun", "VirtualRun"]);
 // workout_type de Strava para carreras: 1 carrera, 2 tirada larga, 3 entrenamiento
@@ -73,7 +73,7 @@ export default async (req) => {
   } catch (err) {
     if (err instanceof ConfigError) return json({ error: "Strava no está configurado en el servidor" }, 503);
     console.error(err);
-    return json({ error: "No se pudo sincronizar con Strava" }, 500);
+    return json({ error: explainDbError(err) || "No se pudo sincronizar con Strava" }, 500);
   }
 };
 

@@ -10,6 +10,26 @@
 -- eso todas las tablas tienen RLS activado y ninguna política.
 -- ============================================================
 
+-- ---------- Limpieza de la versión anterior (login con email) ----------
+-- Si la base tiene el esquema antiguo (perfiles ligados a cuentas de
+-- Supabase Auth), se elimina para crear el nuevo. Esa versión nunca se
+-- usó con datos reales; con el esquema nuevo este bloque no hace nada.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'id' and data_type = 'uuid'
+  ) then
+    if to_regclass('auth.users') is not null then
+      drop trigger if exists on_auth_user_created on auth.users;
+    end if;
+    drop table if exists public.strava_tokens, public.body_metrics, public.sleep, public.meals,
+      public.recipes, public.runs, public.profiles, public.allowed_emails cascade;
+    drop function if exists public.handle_new_user();
+    drop function if exists public.is_allowed();
+  end if;
+end $$;
+
 -- ---------- Perfiles ----------
 create table if not exists public.profiles (
   id                text primary key check (id ~ '^[a-z]{2,20}$'),
