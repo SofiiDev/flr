@@ -146,3 +146,6 @@ alter table public.strava_tokens enable row level security;
 
 revoke all on public.profiles, public.runs, public.recipes, public.meals,
   public.sleep, public.body_metrics, public.strava_tokens from anon, authenticated;
+
+-- que la API de Supabase vea las tablas nuevas sin esperar
+notify pgrst, 'reload schema';
