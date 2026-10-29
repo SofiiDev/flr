@@ -1,0 +1,13 @@
+{
+  "name": "florlovesrunning",
+  "private": true,
+  "type": "module",
+  "description": "FlorLovesRunning: carreras, comidas, sueño y peso de Sofi y Flor (PWA + Supabase + Netlify Functions).",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@supabase/supabase-js": "^2.118.0"
+  }
+}
