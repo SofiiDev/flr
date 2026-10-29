@@ -18,6 +18,7 @@ const ICON = {
   summary: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   left: '<path d="m15 18-6-6 6-6"/>',
   right: '<path d="m9 18 6-6-6-6"/>',
@@ -567,6 +568,90 @@ function bodyForm(rec) {
   openSheet(rec ? "Editar medición" : "Registrar peso", form);
 }
 
+/* ============ guía de uso ============ */
+
+// cada tema: [título, pasos, consejo opcional]; los pasos usan los nombres que se ven en pantalla
+const GUIDE = [
+  ["Primeros pasos", [
+    "Entra con tu usuario (sofi o flor) y tu contraseña. El móvil la recuerda: solo se pide la primera vez.",
+    "Instala la app: en iPhone, Safari → Compartir → «Añadir a pantalla de inicio»; en Android, Chrome → menú ⋮ → «Instalar app».",
+    "Toca tu inicial (arriba a la derecha) para abrir Ajustes.",
+    "En «Objetivos diarios» pon tus calorías, macros, horas de sueño, km por semana, tu altura y, si quieres, tu peso objetivo. Pulsa «Guardar objetivos».",
+    "En «Apariencia» elige tu color y el modo Claro, Oscuro o Sistema.",
+  ]],
+  ["Conectar Garmin con Strava", [
+    "En el móvil, abre Garmin Connect → Ajustes → Aplicaciones conectadas → Strava, y conéctalo. Desde ahí cada actividad del reloj llega sola a Strava.",
+    "En esta app: Ajustes → «Conectar con Strava» → «Autorizar».",
+    "Al volver verás «Strava conectado» y se importan tus carreras.",
+    "Desde entonces, las carreras nuevas entran solas al abrir la app (cada 3 horas) o al pulsar «Sincronizar» en Ajustes.",
+  ], "Solo se importan carreras (también trail y cinta), no bici ni otros deportes. Lo que edites en una carrera importada no se pisa al sincronizar."],
+  ["Registrar una carrera a mano", [
+    "Ve a la pestaña Correr y pulsa «+ Carrera».",
+    "Escribe los kilómetros (puedes usar coma: 5,2) y el tiempo en horas, minutos y segundos. El ritmo por km se calcula solo.",
+    "Elige el tipo (suave, tempo, series, largo o carrera), añade notas si quieres y pulsa «Guardar».",
+    "Para cambiarla, tócala en el historial. Para borrarla, pulsa «Eliminar» dos veces.",
+  ]],
+  ["Registrar lo que comes", [
+    "Ve a Comidas y pulsa «+ Comida». Elige el momento del día.",
+    "Opción 1, con IA: describe lo que comiste con cantidades si las sabes («2 huevos y una tostada con aguacate») y pulsa «Calcular macros con IA».",
+    "Opción 2, desde una receta: elígela en «Desde una receta» e indica cuántas porciones comiste.",
+    "Opción 3, a mano: escribe proteína, carbohidratos y grasas; las calorías se calculan solas.",
+    "Revisa los números y pulsa «Guardar». Con las flechas de arriba cambias de día.",
+  ], "Los cálculos de la IA son aproximados: si tienes la etiqueta del producto, ajusta los valores."],
+  ["Guardar tus recetas", [
+    "En Comidas, toca la pestaña «Recetas» y luego «+ Receta».",
+    "Pon el nombre y cuántas porciones salen.",
+    "Escribe los ingredientes, uno por línea, con la cantidad de la receta completa («400 g lentejas»).",
+    "Pulsa «Calcular macros con IA» y luego «Guardar». La app muestra las calorías y macros por porción.",
+    "Para comer una porción, abre la receta y pulsa «Registrar una porción hoy».",
+  ], "Las recetas son compartidas: las que guarda una, la otra también las ve."],
+  ["Peso, IMC y grasa", [
+    "Ve a Cuerpo y pulsa «+ Peso».",
+    "Escribe tu peso y, si tu báscula la mide, tu grasa corporal (%). La primera vez te pide tu altura para calcular el IMC.",
+    "Pulsa «Guardar». Verás tu evolución de 90 días y cuánto te falta para tu peso objetivo.",
+  ], "Pésate siempre en condiciones parecidas (por ejemplo, en ayunas) para comparar mejor. El IMC no distingue músculo de grasa."],
+  ["Sueño", [
+    "En Cuerpo, toca la pestaña «Sueño» y luego «+ Sueño».",
+    "Indica a qué hora te acostaste y a qué hora te levantaste; las horas se calculan solas, aunque cruces la medianoche.",
+    "Elige la calidad del 1 al 5 y pulsa «Guardar».",
+  ]],
+  ["Ver tu progreso", [
+    "Hoy: tus calorías restantes, los km de la semana, tus horas de sueño y tus macros del día.",
+    "Resumen: elige el periodo (4 semanas, 3 meses, 12 meses o todo) y verás totales, gráficos frente a tus objetivos, tus récords y una tabla mes a mes.",
+    "En los gráficos, toca una barra o un punto para ver el valor exacto.",
+  ]],
+  ["Copia de seguridad y salir", [
+    "Ajustes → «Exportar» guarda un archivo con todos tus datos. «Importar» los recupera.",
+    "Ajustes → «Salir» cierra tu sesión en ese móvil (para entrar con el otro perfil, por ejemplo).",
+  ], "Tus datos se guardan en la nube: si cambias de móvil, entra con tu usuario y aparecen todos."],
+];
+
+function guideSheet() {
+  openSheet("Guía de uso", h("div", { class: "guide" },
+    h("p", { class: "muted" }, "Toca un tema para ver los pasos."),
+    GUIDE.map(([title, steps, tip], i) => h("details", { open: i === 0 },
+      h("summary", {}, title),
+      h("ol", {}, steps.map((st) => h("li", {}, st))),
+      tip && h("p", { class: "guide-tip" }, tip)))));
+}
+
+const guideKey = () => `flr:guia-vista:${account.user?.id}`;
+const guideSeen = () => { try { return localStorage.getItem(guideKey()) === "1"; } catch { return true; } };
+const markGuideSeen = () => { try { localStorage.setItem(guideKey(), "1"); } catch { /* sin almacenamiento */ } };
+
+/** Tarjeta de bienvenida en Hoy hasta que se abre la guía o se oculta. */
+function guideCard() {
+  if (guideSeen()) return null;
+  return h("section", { class: "card guide-card", "aria-label": "Guía de uso" },
+    h("span", { class: "badge", icon: "help" }),
+    h("div", { class: "item-main" },
+      h("h2", {}, "¿Primera vez por aquí?"),
+      h("p", { class: "muted" }, "Mira paso a paso cómo registrar tus carreras, comidas, peso y sueño.")),
+    h("div", { class: "guide-card-actions" },
+      h("button", { type: "button", class: "btn primary", onclick: () => { markGuideSeen(); guideSheet(); render(); } }, "Ver guía"),
+      h("button", { type: "button", class: "link", onclick: () => { markGuideSeen(); render(); } }, "Ocultar")));
+}
+
 function settingsSheet() {
   const g = db.goals;
   const prof = account.profile;
@@ -614,8 +699,9 @@ function settingsSheet() {
   },
     h("div", { class: "account" },
       h("span", { class: "avatar", "aria-hidden": "true" }, (prof?.name || "?").charAt(0)),
-      h("div", { class: "item-main" }, h("strong", {}, prof?.name || ""), h("p", { class: "muted" }, prof?.email || "")),
+      h("div", { class: "item-main" }, h("strong", {}, prof?.name || ""), h("p", { class: "muted" }, `Usuario: ${prof?.id || ""}`)),
       h("button", { type: "button", class: "btn ghost", icon: "logout", onclick: signOut }, "Salir")),
+    h("button", { type: "button", class: "btn ghost block guide-btn", icon: "help", onclick: () => { markGuideSeen(); guideSheet(); } }, "Guía de uso"),
 
     h("h3", { class: "section-title" }, "Apariencia"),
     appearance(),
@@ -890,6 +976,7 @@ function viewToday() {
   const left = g.kcal - kcal;
 
   return [
+    guideCard(),
     h("section", { class: "card", "aria-label": "Tu día" },
       h("div", { class: "hello" },
         h("h2", {}, `Hola, ${account.profile?.name || ""}`),

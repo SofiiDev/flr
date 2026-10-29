@@ -15,6 +15,8 @@ App móvil privada (PWA instalable) para **Sofi y Flor**: carreras, comidas, rec
 
 Pestañas: Hoy · Correr · Comidas (Diario / Recetas) · Cuerpo (Peso y grasa / Sueño) · Resumen.
 
+**Guía de uso dentro de la app**: Ajustes → «Guía de uso», con los pasos para cada tarea (primeros pasos, conectar Garmin con Strava, carreras, comidas, recetas, peso, sueño, progreso y copia de seguridad). La primera vez, la pantalla Hoy muestra un acceso directo.
+
 ## Cómo funciona
 
 | Pieza | Dónde |
