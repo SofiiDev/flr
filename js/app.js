@@ -687,7 +687,7 @@ async function syncStrava({ button, silent } = {}) {
 
 /* ============ componentes de vista ============ */
 
-function ring(value, goal, big, small) {
+function ring(value, goal, big, small, { color = "", size = "" } = {}) {
   const r = 54, circ = 2 * Math.PI * r;
   const pct = goal ? value / goal : 0;
   const ns = "http://www.w3.org/2000/svg";
@@ -703,8 +703,10 @@ function ring(value, goal, big, small) {
     return c;
   };
   svg.append(mk("track"));
-  if (pct > 0) svg.append(mk(pct > 1.05 ? "fill over" : "fill", circ * (1 - Math.min(pct, 1))));
-  return h("div", { class: "ring", role: "img", "aria-label": `${big} ${small}` },
+  // pasarse del objetivo solo es "malo" en calorías (anillo sin color propio)
+  const over = pct > 1.05 && !color;
+  if (pct > 0) svg.append(mk(over ? "fill over" : `fill ${color}`, circ * (1 - Math.min(pct, 1))));
+  return h("div", { class: `ring ${size}`, role: "img", "aria-label": `${big} ${small}` },
     svg, h("div", { class: "ring-label" }, h("strong", { class: "num" }, big), h("span", {}, small)));
 }
 
@@ -750,10 +752,12 @@ function emptyState(iconName, title, text) {
   return h("div", { class: "empty" }, h("div", { icon: iconName }), h("p", {}, h("strong", {}, title)), h("p", {}, text));
 }
 
-function stat(value, unit, label) {
+/** Cifra con su etiqueta encima y, opcional, una nota breve debajo (objetivo, variación…). */
+function stat(value, unit, label, note) {
   return h("div", {},
+    h("div", { class: "stat-label" }, label),
     h("div", { class: "stat-value" }, value, unit && h("small", {}, unit)),
-    h("div", { class: "stat-label" }, label));
+    note && h("div", { class: "stat-note" }, note));
 }
 
 const fab = (label, onclick) => h("button", { type: "button", class: "btn primary fab", icon: "plus", onclick }, label);
@@ -846,27 +850,37 @@ function viewToday() {
   const lastBody = [...db.body].sort(byDateAsc).at(-1);
   const lastBmi = lastBody ? bmiOf(lastBody.weight) : 0;
 
+  const kcal = sum(meals, "kcal");
+  const left = g.kcal - kcal;
+
   return [
-    h("p", { class: "muted", style: "margin:-4px 0 16px" },
-      `Hola, ${account.profile?.name || ""} · `,
-      new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" })),
-    nutritionCard(meals, "Nutrición"),
-    h("section", { class: "card", "aria-label": "Resumen de la semana" },
-      h("div", { class: "card-head" }, h("h2", {}, "Esta semana")),
-      h("div", { class: "stats" },
-        stat(fmt1(weekKm), `/ ${fmt0(g.km)} km`, `${weekRuns.length} ${weekRuns.length === 1 ? "carrera" : "carreras"}`),
-        stat(lastSleep ? fmt1(lastSleep.hours) : "—", "h", lastSleep ? `Último sueño (${dayLabel(lastSleep.date).toLowerCase()})` : "Sin registros de sueño"),
-        stat(avgSleep ? fmt1(avgSleep) : "—", `/ ${fmt1(g.sleep)} h`, "Media de sueño 7 días")),
-      h("div", { class: "bar", style: "margin-top:16px", role: "progressbar", "aria-label": "Kilómetros de la semana", "aria-valuemin": 0, "aria-valuemax": g.km, "aria-valuenow": round1(weekKm) },
-        h("i", { style: `width:${g.km ? Math.min(100, (weekKm / g.km) * 100) : 0}%;background:var(--run)` }))),
+    h("section", { class: "card", "aria-label": "Tu día" },
+      h("div", { class: "hello" },
+        h("h2", {}, `Hola, ${account.profile?.name || ""}`),
+        h("p", { class: "muted" }, capitalize(new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" })))),
+      h("div", { class: "rings" },
+        h("div", { class: "ring-item" },
+          ring(kcal, g.kcal, fmt0(Math.abs(left)), left >= 0 ? "restantes" : "de más", { size: "sm" }),
+          h("div", {}, h("b", {}, "Calorías"), h("span", {}, `${fmt0(kcal)} / ${fmt0(g.kcal)}`))),
+        h("div", { class: "ring-item" },
+          ring(weekKm, g.km, fmt1(weekKm), "km", { color: "run", size: "sm" }),
+          h("div", {}, h("b", {}, "Semana"), h("span", {}, `de ${fmt0(g.km)} km`))),
+        h("div", { class: "ring-item" },
+          ring(lastSleep?.hours || 0, g.sleep, lastSleep ? fmt1(lastSleep.hours) : "—", "horas", { color: "sleep", size: "sm" }),
+          h("div", {}, h("b", {}, "Sueño"), h("span", {}, avgSleep ? `media ${fmt1(avgSleep)} h` : "sin registros"))))),
+    h("section", { class: "card", "aria-label": "Macros de hoy" },
+      h("div", { class: "card-head" }, h("h2", {}, "Macros de hoy"), h("span", { class: "muted num" }, `${fmt0(kcal)} kcal`)),
+      macroBar("p", "Proteína", sum(meals, "p"), g.p),
+      macroBar("c", "Carbos", sum(meals, "c"), g.c),
+      macroBar("f", "Grasas", sum(meals, "f"), g.f)),
     h("section", { class: "card", "aria-label": "Cuerpo" },
       h("div", { class: "card-head" },
         h("h2", {}, "Cuerpo"),
         h("button", { type: "button", class: "link", onclick: () => go("body") }, "Ver evolución")),
       lastBody
         ? h("div", { class: "stats" },
-            stat(fmt1(lastBody.weight), "kg", `Peso (${dayLabel(lastBody.date).toLowerCase()})`),
-            stat(lastBmi ? fmt1(lastBmi) : "—", "", lastBmi ? `IMC · ${bmiLabel(lastBmi)}` : "IMC: falta tu altura"),
+            stat(fmt1(lastBody.weight), "kg", "Peso", dayLabel(lastBody.date)),
+            stat(lastBmi ? fmt1(lastBmi) : "—", "", "IMC", lastBmi ? capitalize(bmiLabel(lastBmi)) : "Falta tu altura"),
             stat(lastBody.fat ? fmt1(lastBody.fat) : "—", "%", "Grasa corporal"))
         : h("p", { class: "muted" }, "Registra tu peso para ver tu IMC y su evolución.")),
     h("section", { class: "card", "aria-label": "Registro rápido" },
@@ -900,7 +914,7 @@ function viewRuns() {
   return [
     h("section", { class: "card", "aria-label": "Resumen de carreras" },
       h("div", { class: "stats" },
-        stat(fmt1(sum(week, "km")), `/ ${fmt0(g.km)} km`, "Esta semana"),
+        stat(fmt1(sum(week, "km")), "km", "Esta semana", `Objetivo ${fmt0(g.km)} km`),
         stat(fmt1(sum(month, "km")), "km", "Este mes"),
         stat(monthTimed.length ? fmtDur(sum(monthTimed, "sec") / sum(monthTimed, "km")) : "—", "/km", "Ritmo medio mes"),
         stat(fmt1(longest), "km", "Más larga"))),
@@ -974,7 +988,7 @@ function viewSleep() {
     bodyNav("sleep"),
     h("section", { class: "card", "aria-label": "Resumen de sueño" },
       h("div", { class: "stats" },
-        stat(avg ? fmt1(avg) : "—", `/ ${fmt1(g.sleep)} h`, "Media 7 días"),
+        stat(avg ? fmt1(avg) : "—", "h", "Media 7 días", `Objetivo ${fmt1(g.sleep)} h`),
         stat(avgQ ? fmt1(avgQ) : "—", "/ 5", "Calidad media"),
         stat(fmt1(debt), "h", "Déficit semanal"))),
     h("section", { class: "card", "aria-label": "Últimas 7 noches" },
@@ -1019,10 +1033,10 @@ function viewBody() {
     h("section", { class: "card", "aria-label": "Última medición" },
       last
         ? h("div", { class: "stats" },
-            stat(fmt1(last.weight), "kg", month.length > 1 ? `${fmtDelta(last.weight - month[0].weight, "kg")} en 30 días` : `Peso · ${dayLabel(last.date).toLowerCase()}`),
-            stat(bmi ? fmt1(bmi) : "—", "", bmi ? `IMC · ${bmiLabel(bmi)}` : "IMC"),
+            stat(fmt1(last.weight), "kg", "Peso", month.length > 1 ? `${fmtDelta(last.weight - month[0].weight, "kg")} en 30 días` : dayLabel(last.date)),
+            stat(bmi ? fmt1(bmi) : "—", "", "IMC", bmi ? capitalize(bmiLabel(bmi)) : "Falta tu altura"),
             stat(last.fat ? fmt1(last.fat) : "—", "%", "Grasa corporal"),
-            g.weight ? stat(fmt1(Math.abs(last.weight - g.weight)), "kg", Math.abs(last.weight - g.weight) < 0.05 ? "¡Objetivo alcanzado!" : `para tu objetivo (${fmt1(g.weight)} kg)`) : null)
+            g.weight ? stat(fmt1(Math.abs(last.weight - g.weight)), "kg", "Para tu objetivo", Math.abs(last.weight - g.weight) < 0.05 ? "¡Alcanzado!" : `Objetivo ${fmt1(g.weight)} kg`) : null)
         : emptyState("body", "Sin mediciones todavía", "Registra tu peso y, si la tienes, tu grasa corporal.")),
     recent.length && h("section", { class: "card", "aria-label": "Peso últimos 90 días" },
       h("div", { class: "card-head" }, h("h2", {}, "Peso · 90 días")),
@@ -1159,14 +1173,14 @@ function viewSummary() {
     h("section", { class: "card", "aria-label": "Totales del periodo" },
       h("div", { class: "card-head" }, h("h2", {}, "En este periodo"), h("span", { class: "muted" }, `desde ${shortDate(start)}`)),
       h("div", { class: "stats" },
-        stat(fmt1(sum(runs, "km")), "km", `${runs.length} ${runs.length === 1 ? "carrera" : "carreras"}`),
+        stat(fmt1(sum(runs, "km")), "km", "Distancia", `${runs.length} ${runs.length === 1 ? "carrera" : "carreras"}`),
         stat(timed.length ? fmtDur(sum(timed, "sec") / sum(timed, "km")) : "—", "/km", "Ritmo medio"),
-        stat(meals.length ? fmt0(kcalPerDay(meals)) : "—", "kcal", `Media diaria · objetivo ${fmt0(g.kcal)}`),
-        stat(meals.length ? fmt0(sum(meals, "p") / new Set(meals.map((m) => m.date)).size) : "—", "g", `Proteína/día · objetivo ${fmt0(g.p)}`),
-        stat(sleep.length ? fmt1(avgOf(sleep, "hours")) : "—", "h", `Sueño medio · objetivo ${fmt1(g.sleep)}`),
-        stat(lastW ? fmt1(lastW.weight) : "—", "kg", body.length > 1 ? `Peso · ${fmtDelta(lastW.weight - firstW.weight, "kg")}` : "Peso"),
-        stat(bmi ? fmt1(bmi) : "—", "", bmi ? `IMC · ${bmiLabel(bmi)}` : "IMC"),
-        stat(fatList.length ? fmt1(fatList.at(-1).fat) : "—", "%", fatList.length > 1 ? `Grasa · ${fmtDelta(fatList.at(-1).fat - fatList[0].fat, "pts")}` : "Grasa corporal"))),
+        stat(meals.length ? fmt0(kcalPerDay(meals)) : "—", "kcal", "Calorías por día", `Objetivo ${fmt0(g.kcal)}`),
+        stat(meals.length ? fmt0(sum(meals, "p") / new Set(meals.map((m) => m.date)).size) : "—", "g", "Proteína por día", `Objetivo ${fmt0(g.p)} g`),
+        stat(sleep.length ? fmt1(avgOf(sleep, "hours")) : "—", "h", "Sueño medio", `Objetivo ${fmt1(g.sleep)} h`),
+        stat(lastW ? fmt1(lastW.weight) : "—", "kg", "Peso", body.length > 1 ? `${fmtDelta(lastW.weight - firstW.weight, "kg")} en el periodo` : null),
+        stat(bmi ? fmt1(bmi) : "—", "", "IMC", bmi ? capitalize(bmiLabel(bmi)) : null),
+        stat(fatList.length ? fmt1(fatList.at(-1).fat) : "—", "%", "Grasa corporal", fatList.length > 1 ? `${fmtDelta(fatList.at(-1).fat - fatList[0].fat, "pts")} en el periodo` : null))),
 
     h("section", { class: "card", "aria-label": `Kilómetros por ${per}` },
       h("div", { class: "card-head" }, h("h2", {}, `Kilómetros por ${per}`)),
@@ -1242,12 +1256,17 @@ const titleEl = document.getElementById("viewTitle");
 const tabs = [...document.querySelectorAll(".tabbar button")];
 
 tabs.forEach((b) => {
-  b.insertAdjacentHTML("afterbegin", icon(b.dataset.view));
+  b.insertAdjacentHTML("afterbegin", `<span class="tab-icon">${icon(b.dataset.view)}</span>`);
   b.addEventListener("click", () => go(b.dataset.view));
 });
 
 const settingsBtn = document.getElementById("settingsBtn");
 settingsBtn.insertAdjacentHTML("afterbegin", icon("settings"));
+// con sesión, el botón de ajustes muestra la inicial de la usuaria
+const showAvatar = () => {
+  const name = account.profile?.name;
+  if (name) settingsBtn.replaceChildren(h("span", { class: "avatar", "aria-hidden": "true" }, name.charAt(0)));
+};
 settingsBtn.addEventListener("click", settingsSheet);
 
 function go(view) {
@@ -1267,6 +1286,7 @@ function render() {
     if (b.dataset.view === v.tab) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
   });
+  showAvatar();
   viewEl.replaceChildren(...[v.render()].flat(Infinity).filter(Boolean));
 }
 
@@ -1315,9 +1335,10 @@ function renderLogin(errorKey) {
     if (error) { google.disabled = false; status.textContent = "No se pudo abrir Google. Inténtalo de nuevo."; }
   });
   viewEl.replaceChildren(h("section", { class: "login" },
-    h("img", { src: "icons/icon.svg", alt: "", width: 72, height: 72 }),
-    h("h1", {}, "FlorLovesRunning"),
-    h("p", { class: "muted" }, "Kilómetros, comidas y sueño de Sofi y Flor."),
+    h("div", { class: "login-hero" },
+      h("img", { src: "icons/icon.svg", alt: "", width: 88, height: 88 }),
+      h("h1", {}, "FlorLovesRunning"),
+      h("p", {}, "Kilómetros, comidas, sueño y peso de Sofi y Flor.")),
     h("div", { class: "login-actions" },
       google,
       h("a", { class: "btn block strava-btn", href: "/api/strava/start", icon: "strava" }, "Continuar con Strava")),
