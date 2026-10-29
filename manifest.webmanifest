@@ -1,7 +1,7 @@
 {
   "name": "FlorLovesRunning",
   "short_name": "FlorLovesRunning",
-  "description": "Kilómetros, comidas, sueño y peso de Sofi y Flor, con macros por IA y carreras de Garmin vía Strava.",
+  "description": "Tus kilómetros, comidas, sueño y peso en un solo lugar, con macros por IA y carreras de Garmin vía Strava.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",

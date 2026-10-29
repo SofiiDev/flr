@@ -1338,7 +1338,7 @@ function renderLogin(errorKey) {
     h("div", { class: "login-hero" },
       h("img", { src: "icons/icon.svg", alt: "", width: 88, height: 88 }),
       h("h1", {}, "FlorLovesRunning"),
-      h("p", {}, "Kilómetros, comidas, sueño y peso de Sofi y Flor.")),
+      h("p", {}, "Tus kilómetros, comidas, sueño y peso, en un solo lugar.")),
     h("div", { class: "login-actions" },
       google,
       h("a", { class: "btn block strava-btn", href: "/api/strava/start", icon: "strava" }, "Continuar con Strava")),
