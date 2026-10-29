@@ -1,9 +1,7 @@
 /* FlorLovesRunning — vuelta de Strava tras autorizar
-   - mode "connect": guarda los tokens y vincula la atleta a la cuenta.
-   - mode "login":   busca la cuenta vinculada a esa atleta y crea un
-                     enlace de acceso de un solo uso que la app canjea. */
+   Guarda los tokens y vincula la atleta al perfil que inició la conexión. */
 
-import { redirect, readState, supabaseAdmin, stravaTokenRequest, APP_PATH } from "../lib/server.mjs";
+import { redirect, readToken, supabaseAdmin, stravaTokenRequest, APP_PATH } from "../lib/server.mjs";
 
 const back = (req, params) => {
   const u = new URL(APP_PATH, req.url);
@@ -13,7 +11,7 @@ const back = (req, params) => {
 
 export default async (req) => {
   const url = new URL(req.url);
-  const state = readState(url.searchParams.get("state"));
+  const state = readToken(url.searchParams.get("state"), "strava");
   if (!state) return back(req, { error: "strava_state" });
   if (url.searchParams.get("error")) return back(req, { error: "strava_denied" });
 
@@ -30,39 +28,24 @@ export default async (req) => {
 
   const db = supabaseAdmin();
   const athleteId = tok.athlete?.id;
-  const tokenRow = {
+  // si esta atleta estaba vinculada al otro perfil, se desvincula de él
+  await db.from("strava_tokens").delete().eq("athlete_id", athleteId).neq("profile_id", state.profile);
+  await db.from("profiles").update({ strava_athlete_id: null }).eq("strava_athlete_id", athleteId).neq("id", state.profile);
+
+  const { error: e1 } = await db.from("strava_tokens").upsert({
+    profile_id: state.profile,
     athlete_id: athleteId,
     access_token: tok.access_token,
     refresh_token: tok.refresh_token,
     expires_at: new Date(tok.expires_at * 1000).toISOString(),
     updated_at: new Date().toISOString(),
-  };
-
-  if (state.mode === "connect") {
-    // si esta atleta estaba vinculada a la otra cuenta, se desvincula de ella
-    await db.from("strava_tokens").delete().eq("athlete_id", athleteId).neq("user_id", state.uid);
-    await db.from("profiles").update({ strava_athlete_id: null }).eq("strava_athlete_id", athleteId).neq("id", state.uid);
-
-    const { error: e1 } = await db.from("strava_tokens").upsert({ user_id: state.uid, ...tokenRow });
-    const { error: e2 } = await db.from("profiles").update({ strava_athlete_id: athleteId }).eq("id", state.uid);
-    if (e1 || e2) {
-      console.error(e1 || e2);
-      return back(req, { error: "strava_save" });
-    }
-    return back(req, { strava: "connected" });
+  });
+  const { error: e2 } = await db.from("profiles").update({ strava_athlete_id: athleteId }).eq("id", state.profile);
+  if (e1 || e2) {
+    console.error(e1 || e2);
+    return back(req, { error: "strava_save" });
   }
-
-  // login
-  const { data: profile } = await db.from("profiles").select("id, email").eq("strava_athlete_id", athleteId).maybeSingle();
-  if (!profile) return back(req, { error: "strava_unlinked" });
-
-  await db.from("strava_tokens").upsert({ user_id: profile.id, ...tokenRow });
-  const { data, error } = await db.auth.admin.generateLink({ type: "magiclink", email: profile.email });
-  if (error) {
-    console.error(error);
-    return back(req, { error: "strava_login" });
-  }
-  return back(req, { login: data.properties.hashed_token });
+  return back(req, { strava: "connected" });
 };
 
 export const config = { path: "/api/strava/callback" };

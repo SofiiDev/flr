@@ -430,7 +430,8 @@ body.signed-out { padding-bottom: 0; }
 .login .error:empty { display: none; }
 .login .hint { max-width: 36ch; margin: 0 auto; }
 
-.google-btn { background: var(--surface); border-color: var(--line); color: var(--text); }
+.login-form { display: flex; flex-direction: column; text-align: left; margin-top: var(--s2); }
+.login-form .btn { margin-top: var(--s2); }
 .strava-btn { background: #FC4C02; color: #FFFFFF; }   /* naranja de marca de Strava */
 
 .account { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s2); }

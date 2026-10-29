@@ -2,7 +2,7 @@
    Red primero para que las actualizaciones lleguen enseguida;
    si no hay conexión se sirve la copia en caché (funciona offline). */
 
-const CACHE = "flr-v1";
+const CACHE = "flr-v2";
 const ASSETS = [
   "./",
   "index.html",
@@ -10,8 +10,6 @@ const ASSETS = [
   "js/app.js",
   "js/store.js",
   "js/charts.js",
-  "js/config.js",
-  "vendor/supabase.js",
   "manifest.webmanifest",
   "icons/icon.svg",
   "icons/icon-maskable.svg",

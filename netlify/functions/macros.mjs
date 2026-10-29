@@ -1,10 +1,10 @@
 /* FlorLovesRunning — estimación de macros con Claude
    POST /api/macros  { text: "2 huevos y una tostada", servings?: 4 }
    → { items: [{ name, quantity, kcal, p, c, f }], total: { kcal, p, c, f }, notes }
-   Requiere sesión de Supabase. La API key vive solo en el servidor (ANTHROPIC_API_KEY). */
+   Requiere sesión de la app. La API key vive solo en el servidor (ANTHROPIC_API_KEY). */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { getUser, sameOrigin, ConfigError } from "../lib/server.mjs";
+import { sessionProfile, sameOrigin, ConfigError } from "../lib/server.mjs";
 
 const MAX_CHARS = 3000;
 
@@ -54,11 +54,11 @@ export default async (req) => {
 
   if (!sameOrigin(req)) return json({ error: "Origen no permitido" }, 403);
 
-  // solo Sofi y Flor: la IA cuesta dinero
+  // solo con sesión: la IA cuesta dinero
   try {
-    if (!(await getUser(req))) return json({ error: "Inicia sesión para usar la IA" }, 401);
+    if (!sessionProfile(req)) return json({ error: "Inicia sesión para usar la IA" }, 401);
   } catch (err) {
-    if (err instanceof ConfigError) return json({ error: "La base de datos no está configurada en el servidor" }, 503);
+    if (err instanceof ConfigError) return json({ error: "Falta configurar la app en Netlify (STATE_SECRET)" }, 503);
     throw err;
   }
 

@@ -1,15 +1,49 @@
-/* FlorLovesRunning — datos en Supabase
-   Al iniciar sesión se cargan todos los registros de la usuaria (y las
-   recetas compartidas) en memoria; las vistas leen de `db` al instante y
-   cada cambio se escribe en Supabase en segundo plano, en orden. La
-   seguridad real está en las políticas RLS de supabase/schema.sql. */
+/* FlorLovesRunning — datos del perfil
+   Al entrar se cargan todos los registros del perfil (y las recetas
+   compartidas) en memoria; las vistas leen de `db` al instante y cada
+   cambio se guarda en segundo plano, en orden, a través de /api/data.
+   El navegador nunca habla con Supabase: el servidor comprueba la sesión
+   y decide qué puede leer o escribir cada perfil. */
 
 export const DEFAULT_GOALS = { kcal: 2200, p: 140, c: 250, f: 70, sleep: 8, km: 30 };
 
-const cfg = window.RITMO_CONFIG;
-export const sb = cfg?.supabaseUrl && cfg?.supabaseAnonKey && window.supabase
-  ? window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey)
-  : null;
+/* ---------- sesión (usuario y contraseña, recordada en el móvil) ---------- */
+
+const SESSION_KEY = "flr:session";
+export const session = { token: null, profile: null };
+try {
+  const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || "{}");
+  if (typeof saved.token === "string" && typeof saved.profile === "string") Object.assign(session, saved);
+} catch { /* sin almacenamiento: habrá que entrar en cada visita */ }
+
+export function setSession(next) {
+  session.token = next?.token || null;
+  session.profile = next?.profile || null;
+  try {
+    if (session.token) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    else localStorage.removeItem(SESSION_KEY);
+  } catch { /* sin almacenamiento */ }
+}
+
+export class SessionExpired extends Error {}
+
+/** POST a una función de la app con la sesión; lanza Error con el mensaje del servidor. */
+export async function api(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}) },
+    body: JSON.stringify(body || {}),
+  });
+  let data = null;
+  try { data = await res.json(); } catch { /* respuesta no JSON */ }
+  if (res.status === 401 && session.token) {
+    setSession(null);
+    throw new SessionExpired(data?.error || "Inicia sesión de nuevo");
+  }
+  if (!res.ok) throw new Error(data?.error || "No se pudo conectar. Revisa tu conexión.");
+  return data;
+}
+const call = (action, extra) => api("/api/data", { action, ...extra });
 
 const num = (v, min = 0, max = 1e6) => {
   const n = Number(v);
@@ -118,16 +152,11 @@ export const account = { user: null, profile: null, loadedAt: 0 };
 /* ---------- carga ---------- */
 
 export async function loadAll() {
-  const uidv = account.user.id;
-  const [profile, ...lists] = await Promise.all([
-    sb.from("profiles").select("*").eq("id", uidv).single(),
-    ...COLLECTIONS.map((c) => sb.from(TABLE[c]).select("*")),
-  ]);
-  for (const r of [profile, ...lists]) if (r.error) throw r.error;
-  account.profile = profile.data;
-  db.goals = cleanGoals(profile.data.goals);
-  COLLECTIONS.forEach((c, i) => {
-    db[c] = lists[i].data.map((row) => clean[c](fromRow[c](row))).filter(Boolean);
+  const data = await call("load");
+  account.profile = data.profile;
+  db.goals = cleanGoals(data.profile.goals);
+  COLLECTIONS.forEach((c) => {
+    db[c] = (data[TABLE[c]] || []).map((row) => clean[c](fromRow[c](row))).filter(Boolean);
   });
   account.loadedAt = Date.now();
 }
@@ -142,7 +171,6 @@ function enqueue(task) {
   queue = queue.then(task).catch((err) => { console.error(err); onError(err); });
   return queue;
 }
-const must = ({ error }) => { if (error) throw error; };
 
 /** Inserta o reemplaza un registro. Actualiza la memoria al momento y guarda en segundo plano. */
 export function upsert(collection, record) {
@@ -152,18 +180,18 @@ export function upsert(collection, record) {
   const i = list.findIndex((x) => x.id === rec.id);
   if (i >= 0) list[i] = { ...list[i], ...rec, source: list[i].source ?? rec.source };
   else list.push(rec);
-  enqueue(async () => must(await sb.from(TABLE[collection]).upsert(toRow[collection](rec))));
+  enqueue(() => call("upsert", { table: TABLE[collection], row: toRow[collection](rec) }));
   return rec;
 }
 
 export function remove(collection, recId) {
   db[collection] = db[collection].filter((x) => x.id !== recId);
-  enqueue(async () => must(await sb.from(TABLE[collection]).delete().eq("id", recId)));
+  enqueue(() => call("delete", { table: TABLE[collection], id: recId }));
 }
 
 export function setGoals(goals) {
   db.goals = cleanGoals(goals);
-  enqueue(async () => must(await sb.from("profiles").update({ goals: db.goals }).eq("id", account.user.id)));
+  enqueue(() => call("profile", { patch: { goals: db.goals } }));
 }
 
 export const ACCENTS = ["rosa", "violeta", "azul", "turquesa", "verde", "grafito"];
@@ -177,14 +205,14 @@ export const cleanPrefs = (p = {}) => ({
 export function setPrefs(prefs) {
   const v = cleanPrefs(prefs);
   account.profile.prefs = v;
-  enqueue(async () => must(await sb.from("profiles").update({ prefs: v }).eq("id", account.user.id)));
+  enqueue(() => call("profile", { patch: { prefs: v } }));
 }
 
 /** Guarda la altura (cm) para calcular el IMC. */
 export function setHeight(cm) {
   const v = num(cm, 100, 250);
   account.profile.height_cm = v || null;
-  enqueue(async () => must(await sb.from("profiles").update({ height_cm: v || null }).eq("id", account.user.id)));
+  enqueue(() => call("profile", { patch: { height_cm: v || null } }));
 }
 
 /** Espera a que terminen las escrituras pendientes. */
@@ -210,16 +238,16 @@ export async function importJSON(text) {
   for (const c of ["recipes", "runs", "meals", "sleep", "body"]) {
     const list = fresh(c, raw[c]);
     for (let i = 0; i < list.length; i += 500) {
-      must(await sb.from(TABLE[c]).insert(list.slice(i, i + 500).map(toRow[c])));
+      await call("insert", { table: TABLE[c], rows: list.slice(i, i + 500).map(toRow[c]) });
     }
   }
-  if (raw.goals) must(await sb.from("profiles").update({ goals: cleanGoals(raw.goals) }).eq("id", account.user.id));
+  if (raw.goals) await call("profile", { patch: { goals: cleanGoals(raw.goals) } });
   await loadAll();
 }
 
-/** Borra los registros de la usuaria (las recetas compartidas se quedan). */
+/** Borra los registros del perfil (las recetas compartidas se quedan). */
 export async function wipe() {
   await flush();
-  for (const c of ["meals", "runs", "sleep", "body"]) must(await sb.from(TABLE[c]).delete().eq("user_id", account.user.id));
+  await call("wipe");
   await loadAll();
 }

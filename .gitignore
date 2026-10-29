@@ -2,6 +2,3 @@ node_modules/
 .netlify/
 .env
 .DS_Store
-# generados por npm run build
-vendor/
-js/config.js
