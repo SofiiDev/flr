@@ -635,21 +635,95 @@ function guideSheet() {
       tip && h("p", { class: "guide-tip" }, tip)))));
 }
 
-const guideKey = () => `flr:guia-vista:${account.user?.id}`;
-const guideSeen = () => { try { return localStorage.getItem(guideKey()) === "1"; } catch { return true; } };
-const markGuideSeen = () => { try { localStorage.setItem(guideKey(), "1"); } catch { /* sin almacenamiento */ } };
+/* ============ tour guiado ============ */
 
-/** Tarjeta de bienvenida en Hoy hasta que se abre la guía o se oculta. */
-function guideCard() {
-  if (guideSeen()) return null;
-  return h("section", { class: "card guide-card", "aria-label": "Guía de uso" },
-    h("span", { class: "badge", icon: "help" }),
-    h("div", { class: "item-main" },
-      h("h2", {}, "¿Primera vez por aquí?"),
-      h("p", { class: "muted" }, "Mira paso a paso cómo registrar tus carreras, comidas, peso y sueño.")),
-    h("div", { class: "guide-card-actions" },
-      h("button", { type: "button", class: "btn primary", onclick: () => { markGuideSeen(); guideSheet(); render(); } }, "Ver guía"),
-      h("button", { type: "button", class: "link", onclick: () => { markGuideSeen(); render(); } }, "Ocultar")));
+// cada paso: vista a mostrar, elemento a iluminar (selector) y texto; sin selector, el paso va centrado
+const TOUR = [
+  { title: "¡Bienvenida a FlorLovesRunning!", text: "Te muestro la app en un minuto. Puedes saltar el tour cuando quieras y repetirlo desde Ajustes." },
+  { view: "today", target: ".rings", title: "Tu día de un vistazo", text: "Calorías que te quedan, kilómetros de la semana frente a tu objetivo y horas de sueño." },
+  { view: "today", target: ".quick", title: "Registrar rápido", text: "Desde aquí apuntas una carrera, una comida, tu peso o tu sueño en dos toques." },
+  { view: "runs", target: ".fab", title: "Correr", text: "Pulsa «+ Carrera» para añadir una a mano: el ritmo por km se calcula solo. Las de tu Garmin llegan solas vía Strava." },
+  { view: "meals", target: ".fab", title: "Comidas", text: "Pulsa «+ Comida», describe lo que comiste y toca «Calcular macros con IA». También puedes elegir una receta o escribir los macros." },
+  { view: "meals", target: ".subnav", title: "Recetas compartidas", text: "En «Recetas» guardas tus platos con sus ingredientes; la IA calcula los macros por porción. Las ven las dos." },
+  { view: "body", target: ".fab", title: "Peso, IMC y grasa", text: "Pulsa «+ Peso» para apuntar tu peso y, si la tienes, tu grasa corporal. El IMC se calcula con tu altura." },
+  { view: "body", target: ".subnav", title: "Sueño", text: "En esta misma pantalla, la pestaña «Sueño» guarda a qué hora te acostaste, a qué hora te levantaste y cómo dormiste." },
+  { view: "summary", target: ".period", title: "Resumen", text: "Elige el periodo y verás tus totales, gráficos frente a tus objetivos, récords y una tabla mes a mes." },
+  { view: "today", target: "#settingsBtn", title: "Ajustes", text: "Aquí pones tus objetivos, eliges color y modo oscuro y, muy importante, conectas Strava para traer tus carreras del Garmin." },
+  { title: "¡Lista para empezar!", text: "Te recomiendo empezar por Ajustes: pon tus objetivos y conecta Strava. La guía escrita también está ahí.", finish: "Ir a Ajustes" },
+];
+
+const tourKey = () => `flr:tour-visto:${account.user?.id}`;
+const tourSeen = () => { try { return localStorage.getItem(tourKey()) === "1"; } catch { return true; } };
+const markTourSeen = () => { try { localStorage.setItem(tourKey(), "1"); } catch { /* sin almacenamiento */ } };
+
+function startTour() {
+  closeSheet();
+  let i = 0;
+  const spot = h("div", { class: "tour-spot" });
+  const title = h("h3", { id: "tourTitle" });
+  const text = h("p", {});
+  const count = h("span", { class: "tour-count num" });
+  const back = h("button", { type: "button", class: "btn ghost" }, "Atrás");
+  const next = h("button", { type: "button", class: "btn primary" }, "Siguiente");
+  const skip = h("button", { type: "button", class: "link tour-skip" }, "Saltar");
+  const tip = h("div", { class: "tour-tip", role: "dialog", "aria-modal": "true", "aria-labelledby": "tourTitle" },
+    h("div", { class: "tour-head" }, count, skip), title, text, h("div", { class: "tour-actions" }, back, next));
+  const root = h("div", { class: "tour" }, spot, tip);
+  document.body.append(root);
+
+  const place = () => {
+    const step = TOUR[i];
+    const el = step.target && document.querySelector(step.target);
+    const vh = window.innerHeight, pad = 8;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
+      spot.classList.remove("none");
+      const below = r.bottom + pad + 12, th = tip.offsetHeight;
+      tip.style.top = below + th < vh - 12 ? `${below}px` : `${Math.max(12, r.top - pad - 12 - th)}px`;
+    } else {
+      spot.classList.add("none");
+      tip.style.top = `${Math.max(12, (vh - tip.offsetHeight) / 2)}px`;
+    }
+  };
+
+  const show = (n) => {
+    i = n;
+    const step = TOUR[i];
+    if (step.view && state.view !== step.view) go(step.view);
+    title.textContent = step.title;
+    text.textContent = step.text;
+    count.textContent = `${i + 1} de ${TOUR.length}`;
+    back.hidden = i === 0;
+    next.textContent = step.finish || (i === 0 ? "Empezar" : "Siguiente");
+    const el = step.target && document.querySelector(step.target);
+    if (el) el.scrollIntoView({ block: "center", behavior: "instant" });
+    requestAnimationFrame(place);
+    next.focus();
+  };
+
+  const end = (openSettings) => {
+    markTourSeen();
+    root.remove();
+    window.removeEventListener("resize", place);
+    window.removeEventListener("scroll", place, true);
+    document.removeEventListener("keydown", onKey);
+    go("today");
+    if (openSettings) settingsSheet();
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") end(false);
+    else if (e.key === "ArrowRight") next.click();
+    else if (e.key === "ArrowLeft" && i > 0) show(i - 1);
+  };
+
+  next.addEventListener("click", () => (i < TOUR.length - 1 ? show(i + 1) : end(true)));
+  back.addEventListener("click", () => show(i - 1));
+  skip.addEventListener("click", () => end(false));
+  window.addEventListener("resize", place);
+  window.addEventListener("scroll", place, true);
+  document.addEventListener("keydown", onKey);
+  show(0);
 }
 
 function settingsSheet() {
@@ -701,7 +775,9 @@ function settingsSheet() {
       h("span", { class: "avatar", "aria-hidden": "true" }, (prof?.name || "?").charAt(0)),
       h("div", { class: "item-main" }, h("strong", {}, prof?.name || ""), h("p", { class: "muted" }, `Usuario: ${prof?.id || ""}`)),
       h("button", { type: "button", class: "btn ghost", icon: "logout", onclick: signOut }, "Salir")),
-    h("button", { type: "button", class: "btn ghost block guide-btn", icon: "help", onclick: () => { markGuideSeen(); guideSheet(); } }, "Guía de uso"),
+    h("div", { class: "actions guide-btns" },
+      h("button", { type: "button", class: "btn ghost", icon: "help", onclick: () => startTour() }, "Tour guiado"),
+      h("button", { type: "button", class: "btn ghost", onclick: guideSheet }, "Guía escrita")),
 
     h("h3", { class: "section-title" }, "Apariencia"),
     appearance(),
@@ -976,7 +1052,6 @@ function viewToday() {
   const left = g.kcal - kcal;
 
   return [
-    guideCard(),
     h("section", { class: "card", "aria-label": "Tu día" },
       h("div", { class: "hello" },
         h("h2", {}, `Hola, ${account.profile?.name || ""}`),
@@ -1500,6 +1575,7 @@ async function startApp() {
   if (prof.strava_athlete_id && (!prof.strava_synced_at || Date.now() - new Date(prof.strava_synced_at) > 3 * 3600e3)) {
     syncStrava({ silent: true });
   }
+  if (!tourSeen()) setTimeout(startTour, 400);
   return true;
 }
 

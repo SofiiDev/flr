@@ -148,6 +148,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }   /* que ningún estilo de componente lo anule */
 
 html { -webkit-text-size-adjust: 100%; }
 
@@ -600,10 +601,7 @@ body.signed-out { padding-bottom: 0; }
 .swatch input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- guía de uso ---------- */
-.guide-btn { margin-top: var(--s3); }
-.guide-card { display: grid; grid-template-columns: auto 1fr; gap: var(--s2) var(--s3); align-items: start; }
-.guide-card h2 { margin-bottom: 2px; }
-.guide-card-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--s4); margin-top: var(--s2); }
+.guide-btns { margin-top: var(--s3); }
 .guide > .muted { margin-bottom: var(--s3); }
 .guide details { border-top: 1px solid var(--line); }
 .guide details:last-of-type { border-bottom: 1px solid var(--line); }
@@ -621,3 +619,27 @@ body.signed-out { padding-bottom: 0; }
   margin-bottom: var(--s4); padding: var(--s3); border-radius: var(--radius-sm);
   background: var(--accent-soft); color: var(--text); font-size: var(--fs-sm);
 }
+
+/* ---------- tour guiado ---------- */
+.tour { position: fixed; inset: 0; z-index: 80; }
+.tour-spot {
+  position: fixed; border-radius: 18px; pointer-events: none;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 0 9999px rgba(8, 6, 10, .62);
+  transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease;
+}
+.tour-spot.none { left: 50% !important; top: 50% !important; width: 0 !important; height: 0 !important; box-shadow: 0 0 0 9999px rgba(8, 6, 10, .62); }
+.tour-tip {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  width: min(380px, calc(100vw - 32px));
+  padding: var(--s4) var(--s5) var(--s5);
+  background: var(--surface); color: var(--text);
+  border-radius: var(--radius); box-shadow: var(--shadow-float);
+  transition: top .25s ease;
+}
+.tour-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s2); }
+.tour-count { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em; color: var(--accent); text-transform: uppercase; }
+.tour-skip { font-size: var(--fs-sm); color: var(--text-2); padding: var(--s2) 0; }
+.tour-tip h3 { font-family: var(--display); font-size: 1.25rem; font-weight: 700; letter-spacing: -.01em; margin-bottom: var(--s2); }
+.tour-tip p { color: var(--text-2); line-height: 1.5; }
+.tour-actions { display: flex; gap: var(--s3); margin-top: var(--s4); }
+.tour-actions .btn { flex: 1; }
