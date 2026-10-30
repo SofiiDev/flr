@@ -38,6 +38,14 @@
   --chart-body: #00917E;
   --chart-fat: #00917E;
   --chart-sleep: #6D4AD8;
+  --chart-caffeine: #5E8C2F;
+  --mate: #5E8C2F;
+  --mate-foam: #C9DC8F;
+  --steel: #2E3A33;
+  --steel-hi: #4A5A50;
+  --termo-cap: #1F2723;
+  --warn: #B45309;
+  --warn-soft: #FDEBD3;
 
   /* color de acento: lo elige cada perfil (data-accent); por defecto, rosa.
      Todos cumplen 4.5:1 como texto sobre --surface y --bg, y con --accent-ink encima. */
@@ -97,6 +105,14 @@
   --chart-body: #13A08E;
   --chart-fat: #13A08E;
   --chart-sleep: #8A6AE8;
+  --chart-caffeine: #6FA33A;
+  --mate: #6FA33A;
+  --mate-foam: #B9D27E;
+  --steel: #3A4A40;
+  --steel-hi: #5A6E62;
+  --termo-cap: #26302A;
+  --warn: #F5A524;
+  --warn-soft: #3A2A12;
   --accent: #FF7AA2;
   --accent-soft: #3A1D29;
   --accent-ink: #0C0B0E;
@@ -133,6 +149,14 @@
     --chart-body: #13A08E;
     --chart-fat: #13A08E;
     --chart-sleep: #8A6AE8;
+  --chart-caffeine: #6FA33A;
+  --mate: #6FA33A;
+  --mate-foam: #B9D27E;
+  --steel: #3A4A40;
+  --steel-hi: #5A6E62;
+  --termo-cap: #26302A;
+  --warn: #F5A524;
+  --warn-soft: #3A2A12;
     --accent: #FF7AA2;
     --accent-soft: #3A1D29;
     --accent-ink: #0C0B0E;
@@ -684,3 +708,31 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; flex: none; a
 .shop-qty { margin-left: var(--s2); color: var(--text-2); font-size: var(--fs-sm); }
 .shop-item.done .shop-name, .shop-item.done .shop-qty { text-decoration: line-through; color: var(--text-3); }
 .shop .actions { margin-top: var(--s5); }
+
+/* ---------- mate y cafeína ---------- */
+.badge.mate { background: color-mix(in srgb, var(--mate) 16%, transparent); color: var(--mate); }
+.mate-panel { display: grid; grid-template-columns: 96px 1fr; gap: var(--s4); align-items: center; }
+.mate-stats { grid-template-columns: 1fr; gap: var(--s3); }
+.mate-stats .chip { justify-self: start; }
+.warn-chip { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+.termo-wrap { width: 96px; }
+.termo { display: block; width: 100%; height: auto; overflow: visible; }
+.termo-cap, .termo-handle { fill: var(--termo-cap); stroke: var(--termo-cap); }
+.termo-handle { fill: none; }
+.termo-body { fill: var(--steel); }
+.termo-inside { fill: var(--steel-hi); opacity: .55; }
+.termo-fill { fill: var(--mate); transition: fill .4s; }
+.termo-wrap.over .termo-fill { fill: var(--warn); }
+.termo-foam { stroke: var(--mate-foam); opacity: .9; }
+.termo-marks { stroke: var(--surface); stroke-opacity: .35; }
+.termo-pct { font-family: var(--display); font-weight: 700; font-size: 20px; fill: #FFFFFF; font-variant-numeric: tabular-nums; }
+.termo-pct.dark { fill: var(--text); }
+.termo-liquid { transition: transform .9s cubic-bezier(.25, .8, .25, 1); }
+.termo-wave { animation: termo-wave 3.2s linear infinite; }
+@keyframes termo-wave { from { transform: translateX(0); } to { transform: translateX(-60px); } }
+.termo .steam path { stroke: var(--text-3); fill: none; stroke-width: 2.4; stroke-linecap: round; opacity: 0; }
+.termo-wrap.hot .steam path { animation: termo-steam 2.6s ease-in-out infinite; }
+.termo-wrap.hot .steam path:nth-child(2) { animation-delay: .9s; }
+.termo-wrap.hot .steam path:nth-child(3) { animation-delay: 1.7s; }
+@keyframes termo-steam { 0% { opacity: 0; transform: translateY(6px); } 35% { opacity: .55; } 100% { opacity: 0; transform: translateY(-14px); } }
+@media (prefers-reduced-motion: reduce) { .termo-liquid { transition: none; } .termo-wave, .termo-wrap.hot .steam path { animation: none; } }

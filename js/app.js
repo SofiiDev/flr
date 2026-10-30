@@ -2,7 +2,7 @@
    Vistas: Hoy · Correr · Comidas · Recetas · Sueño (+ Ajustes).
    Todo el contenido del usuario se inserta como texto (nunca HTML). */
 
-import { db, account, session, setSession, api, SessionExpired, loadAll, upsert, remove, setGoals, setHeight, setPrefs, cleanPrefs, ACCENTS, exportJSON, importJSON, wipe, uid, flush, onWriteError } from "./store.js";
+import { db, account, session, setSession, api, SessionExpired, CAFFEINE_KINDS, loadAll, upsert, remove, setGoals, setHeight, setPrefs, cleanPrefs, ACCENTS, exportJSON, importJSON, wipe, uid, flush, onWriteError } from "./store.js";
 import { barChart, lineChart } from "./charts.js";
 
 /* ============ utilidades ============ */
@@ -12,6 +12,7 @@ const ICON = {
   today: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   runs: '<circle cx="13.5" cy="4.5" r="1.8"/><path d="M7 21l3.5-6 3 2.5V22M6.5 11.5 9 8l4 1 2.5 3.5H19M13 9l-2.5 6"/>',
   meals: '<path d="M7 3v8a2 2 0 0 0 2 2v8M11 3v8M5 3v8M17 21V3c-2 1.5-3 4-3 7v4h3"/>',
+  mate: '<path d="M6 9h12l-1.2 9.5a3 3 0 0 1-3 2.5h-3.6a3 3 0 0 1-3-2.5L6 9Z"/><path d="M14 9 17.5 3"/><path d="M8.5 9c.5-2 2-3 3.5-3"/>',
   recipes: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/>',
   sleep: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>',
   body: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 9.5a5 5 0 0 1 8 0M12 12l1.6-2.6"/>',
@@ -633,6 +634,13 @@ const GUIDE = [
     "En el súper, tocá cada producto para tacharlo. Con «Compartir» la mandás por WhatsApp.",
     "El día que la comés, en el Diario aparece en «Planificado»: tocá «Registrar» y se carga con sus macros.",
   ], "Para cambiar o quitar una comida planificada, tocala en la semana."],
+  ["Mate y cafeína", [
+    "En Comidas (Diario) o en Hoy, tocá «+ Mate o café» en la tarjeta «Mate y cafeína».",
+    "Elegí qué tomaste (mate, café, té, energizante u otro) y la cantidad: termos, tazas o latas.",
+    "Si es mate, poné la yerba y cuántos gramos usaste. Si querés, agregá un detalle («lo compartí», «cebé 20 veces»).",
+    "Tocá «Calcular cafeína con IA» y después «Guardar». También podés escribir los mg a mano.",
+    "El termo de la pantalla Hoy se llena con la cafeína del día frente a tu límite; si te pasás, se pone ámbar.",
+  ], "El límite lo cambiás en Ajustes → Objetivos. En Resumen ves la cafeína y los termos por día y su evolución."],
   ["Peso, IMC y grasa", [
     "Andá a Cuerpo y tocá «+ Peso».",
     "Escribí tu peso y, si tu balanza la mide, tu grasa corporal (%). La primera vez te pide tu altura para calcular el IMC.",
@@ -762,6 +770,7 @@ function settingsSheet() {
     c: numInput("c", g.c, { int: true }), f: numInput("f", g.f, { int: true }),
     sleep: numInput("sleep", g.sleep), km: numInput("km", g.km),
     weight: numInput("weight", g.weight || "", { placeholder: "Opcional" }),
+    caffeine: numInput("caffeine", g.caffeine, { int: true }),
   };
   const height = heightInput();
   const fileIn = h("input", { type: "file", accept: "application/json,.json", hidden: true });
@@ -818,6 +827,7 @@ function settingsSheet() {
     h("div", { class: "row" }, field("Proteína (g)", inputs.p), field("Carbos (g)", inputs.c), field("Grasas (g)", inputs.f)),
     h("div", { class: "row" }, field("Sueño (h/noche)", inputs.sleep), field("Km por semana", inputs.km)),
     h("div", { class: "row" }, field("Peso objetivo (kg)", inputs.weight), field("Altura (cm)", height)),
+    field("Cafeína máxima (mg por día)", inputs.caffeine, "La referencia habitual para adultos sanos es 400 mg; en el embarazo, 200 mg. Consultá con tu médica si tenés dudas."),
     h("button", { type: "submit", class: "btn primary block" }, "Guardar objetivos"),
 
     h("h3", { class: "section-title" }, "Tus datos"),
@@ -909,6 +919,153 @@ async function syncStrava({ button, silent } = {}) {
     syncing = false;
     if (button) { button.disabled = false; button.textContent = "Sincronizar"; }
   }
+}
+
+/* ============ mate y cafeína ============ */
+
+// [nombre, unidad singular, unidad plural, mg por unidad para la estimación rápida]
+const KIND_INFO = {
+  mate: ["Mate", "termo", "termos", 150],
+  cafe: ["Café", "taza", "tazas", 95],
+  te: ["Té", "taza", "tazas", 40],
+  energizante: ["Energizante", "lata", "latas", 80],
+  otro: ["Otro", "porción", "porciones", 0],
+};
+const unitOf = (kind, n) => KIND_INFO[kind][n === 1 ? 1 : 2];
+/** Estimación sin IA: en el mate, unos 3 mg por gramo de yerba (≈ 150 mg un termo de 50 g). */
+const quickCaffeine = (kind, amount, yerbaG) => Math.round(kind === "mate" && yerbaG ? yerbaG * 3 : amount * KIND_INFO[kind][3]);
+const termosOf = (list) => sum(list.filter((x) => x.kind === "mate"), "amount");
+const caffeineDay = (d) => db.caffeine.filter((x) => x.date === d);
+
+function caffeineForm(rec, preset = {}) {
+  const x = rec || { date: preset.date || todayISO(), time: nowTime(), kind: "mate", amount: 1, yerba: "", yerbaG: null, desc: "", mg: 0 };
+  const date = h("input", { type: "date", name: "date", value: x.date, required: true });
+  const time = h("input", { type: "time", name: "time", value: x.time });
+  const amount = numInput("amount", x.amount, { placeholder: "1" });
+  const amountLabel = h("label", { for: "cafAmount" }, "");
+  amount.id = "cafAmount";
+  const yerba = h("input", { type: "text", name: "yerba", value: x.yerba, placeholder: "Ej. Playadito con palo", autocomplete: "off" });
+  const yerbaG = numInput("yerbaG", x.yerbaG ?? "", { int: true, placeholder: "50" });
+  const mateFields = h("div", { class: "row" }, field("Yerba", yerba), field("Yerba usada (g)", yerbaG, "Un termo bien cargado lleva unos 50 g."));
+  const desc = h("textarea", { name: "desc", rows: 2, placeholder: "Ej. lo compartí con Flor, cebé unas 20 veces, café doble…" });
+  desc.value = x.desc || "";
+  const mg = numInput("mg", x.mg || "", { int: true });
+  const note = h("p", { class: "ai-note" });
+  const status = h("p", { class: "error", role: "alert" });
+  let mgTouched = Boolean(x.mg);
+  mg.addEventListener("input", () => { mgTouched = mg.value.trim() !== ""; });
+
+  const kindNow = () => form.querySelector('input[name="kind"]:checked')?.value || "mate";
+  const refresh = () => {
+    const k = kindNow();
+    amountLabel.textContent = `Cantidad (${KIND_INFO[k][2]})`;
+    mateFields.hidden = k !== "mate";
+    mg.placeholder = String(quickCaffeine(k, readNum(amount) || 1, readNum(yerbaG)));
+  };
+
+  const ai = h("button", { type: "button", class: "btn ai block", icon: "spark" }, "Calcular cafeína con IA");
+  ai.addEventListener("click", async () => {
+    ai.disabled = true; ai.lastChild.textContent = "Calculando…"; status.textContent = ""; note.textContent = "";
+    try {
+      const k = kindNow();
+      const data = await api("/api/caffeine", { kind: k, amount: readNum(amount) || 1, yerba: yerba.value, yerba_g: readNum(yerbaG), description: desc.value });
+      mg.value = String(data.caffeine_mg); mgTouched = true;
+      note.textContent = data.notes || "";
+    } catch (err) {
+      status.textContent = err.message;
+    } finally {
+      ai.disabled = false; ai.lastChild.textContent = "Calcular cafeína con IA";
+    }
+  });
+
+  const form = sheetForm((f) => {
+    const k = checked(f, "kind");
+    const n = readNum(amount) || 1;
+    const value = mgTouched && mg.value.trim() !== "" ? readNum(mg) : quickCaffeine(k, n, readNum(yerbaG));
+    upsert("caffeine", {
+      id: x.id || uid(), date: date.value || todayISO(), time: time.value || nowTime(), kind: k, amount: n,
+      yerba: k === "mate" ? yerba.value.trim() : "", yerbaG: k === "mate" ? readNum(yerbaG) || null : null,
+      desc: desc.value.trim(), mg: value,
+    });
+    closeSheet(); toast(rec ? "Registro actualizado" : `Anotado: ${fmt0(value)} mg de cafeína`); render();
+  },
+    h("div", { class: "field" }, h("span", { class: "label" }, "Qué tomaste"),
+      segmented("kind", CAFFEINE_KINDS.map((k) => [k, KIND_INFO[k][0]]), x.kind, "Tipo de bebida")),
+    h("div", { class: "row" }, field("Fecha", date), field("Hora", time)),
+    h("div", { class: "field" }, amountLabel, amount),
+    mateFields,
+    field("Detalle (opcional)", desc),
+    h("div", { class: "ai-box" }, ai, note, status),
+    field("Cafeína (mg)", mg, "Calculala con IA o escribila. Si la dejás vacía, usamos la estimación que ves en gris."),
+    formActions(rec && (() => { remove("caffeine", x.id); closeSheet(); toast("Registro eliminado"); render(); })),
+  );
+  form.addEventListener("change", refresh);
+  amount.addEventListener("input", refresh);
+  yerbaG.addEventListener("input", refresh);
+  openSheet(rec ? "Editar mate o café" : "Mate o café", form);
+  refresh();
+}
+
+function caffeineItem(x) {
+  return h("li", { class: "item" },
+    h("button", { type: "button", class: "item-btn", onclick: () => caffeineForm(x) },
+      h("span", { class: "badge mate", icon: "mate" }),
+      h("span", { class: "item-main" },
+        h("span", { class: "item-title", style: "display:block" }, `${fmt1(x.amount)} ${unitOf(x.kind, x.amount)}${x.kind === "mate" ? " de mate" : x.kind === "otro" ? "" : ` de ${KIND_INFO[x.kind][0].toLowerCase()}`}`),
+        h("span", { class: "item-sub" }, x.time, x.yerba && ` · ${x.yerba}`, x.yerbaG ? ` · ${fmt0(x.yerbaG)} g` : "")),
+      h("span", { class: "item-end num" }, fmt0(x.mg), h("small", {}, "mg"))));
+}
+
+/* termo animado: se llena según la cafeína del día frente al límite; ámbar si se pasa */
+const termoSvg = (cid) => `<svg class="termo" viewBox="0 0 120 230" aria-hidden="true">
+  <defs><clipPath id="${cid}"><rect x="22" y="56" width="66" height="158" rx="14"/></clipPath></defs>
+  <g class="steam"><path d="M44 20c-4-6 4-8 0-14"/><path d="M56 22c-4-6 4-8 0-14"/><path d="M68 20c-4-6 4-8 0-14"/></g>
+  <rect x="34" y="26" width="42" height="12" rx="4" class="termo-cap"/>
+  <rect x="28" y="36" width="54" height="18" rx="6" class="termo-cap"/>
+  <rect x="74" y="31" width="14" height="7" rx="3" class="termo-cap"/>
+  <path d="M88 74h10a10 10 0 0 1 10 10v70a10 10 0 0 1-10 10H88" fill="none" class="termo-handle" stroke-width="9" stroke-linejoin="round"/>
+  <rect x="18" y="52" width="74" height="166" rx="18" class="termo-body"/>
+  <rect x="22" y="56" width="66" height="158" rx="14" class="termo-inside"/>
+  <g clip-path="url(#${cid})">
+    <g class="termo-liquid"><g class="termo-wave">
+      <path d="M0 64 q15 -7 30 0 t30 0 t30 0 t30 0 t30 0 V240 H0 Z" class="termo-fill"/>
+      <path d="M0 64 q15 -7 30 0 t30 0 t30 0 t30 0 t30 0" fill="none" class="termo-foam" stroke-width="3"/>
+    </g></g>
+  </g>
+  <g class="termo-marks" stroke-width="2" stroke-linecap="round"><path d="M26 96h8"/><path d="M26 135h8"/><path d="M26 174h8"/></g>
+  <text x="55" y="146" text-anchor="middle" class="termo-pct"></text>
+</svg>`;
+let termoLevel = 0;   // nivel anterior, para animar desde ahí y no desde vacío
+
+function termo(mgDay, limit) {
+  const pct = Math.min(1, limit ? mgDay / limit : 0);
+  const el = h("div", { class: `termo-wrap${mgDay > limit ? " over" : ""}${mgDay > 0 ? " hot" : ""}`, role: "img", "aria-label": `Termo al ${Math.round((mgDay / limit) * 100)} %: ${fmt0(mgDay)} de ${fmt0(limit)} mg de cafeína` });
+  el.insertAdjacentHTML("afterbegin", termoSvg(`termo-${uid().slice(0, 8)}`));
+  const liquid = el.querySelector(".termo-liquid");
+  const level = (p) => `translateY(${56 + 158 * (1 - p) - 64}px)`;
+  liquid.style.transform = level(termoLevel);
+  const label = el.querySelector(".termo-pct");
+  label.textContent = `${Math.round((mgDay / limit) * 100)} %`;
+  if (pct < 0.45) { label.setAttribute("y", String(Math.max(80, 48 + 158 * (1 - pct) - 10))); label.classList.add("dark"); }
+  requestAnimationFrame(() => requestAnimationFrame(() => { liquid.style.transform = level(pct); termoLevel = pct; }));
+  return el;
+}
+
+/** Tarjeta «Mate y cafeína» del día: termo, mg frente al límite, termos y botón para anotar. */
+function caffeineCard(d, { list: showList = false } = {}) {
+  const items = caffeineDay(d).sort((a, b) => a.time.localeCompare(b.time));
+  const total = sum(items, "mg"), limit = db.goals.caffeine, termos = termosOf(items);
+  const over = total > limit, near = !over && total >= limit * 0.75;
+  return h("section", { class: "card", "aria-label": "Mate y cafeína" },
+    h("div", { class: "card-head" }, h("h2", {}, "Mate y cafeína"), h("span", { class: "muted" }, capitalize(dayLabel(d)))),
+    h("div", { class: "mate-panel" },
+      termo(total, limit),
+      h("div", { class: "stats mate-stats" },
+        stat(fmt0(total), "mg", "Cafeína", over ? `${fmt0(total - limit)} mg por encima del límite` : `de ${fmt0(limit)} mg de límite`),
+        stat(fmt1(termos), "", "Termos de mate"),
+        total > 0 && h("span", { class: `chip${over || near ? " warn-chip" : ""}` }, over ? "Pasaste el límite" : near ? "Cerca del límite" : "Te queda margen"))),
+    showList && items.length > 0 && h("ul", { class: "list", style: "margin-top:12px" }, items.map(caffeineItem)),
+    h("button", { type: "button", class: "btn ghost block", icon: "plus", style: "margin-top:12px", onclick: () => caffeineForm(null, { date: d }) }, "Mate o café"));
 }
 
 /* ============ plan semanal y lista de compras ============ */
@@ -1255,6 +1412,7 @@ function viewToday() {
       macroBar("p", "Proteína", sum(meals, "p"), g.p),
       macroBar("c", "Carbos", sum(meals, "c"), g.c),
       macroBar("f", "Grasas", sum(meals, "f"), g.f)),
+    caffeineCard(t),
     h("section", { class: "card", "aria-label": "Cuerpo" },
       h("div", { class: "card-head" },
         h("h2", {}, "Cuerpo"),
@@ -1326,6 +1484,7 @@ function viewMeals() {
       h("button", { type: "button", class: "icon-btn", icon: "right", "aria-label": "Día siguiente", disabled: isToday, onclick: () => { state.mealDate = addDays(d, 1); render(); } })),
     nutritionCard(meals, "Total del día"),
     plannedCard(d),
+    caffeineCard(d, { list: true }),
     groups.length
       ? groups.map(([label, list]) => h("section", { class: "card", "aria-label": label },
           h("div", { class: "card-head" }, h("h2", {}, label), h("span", { class: "muted num" }, `${fmt0(sum(list, "kcal"))} kcal`)),
@@ -1570,7 +1729,8 @@ function viewSummary() {
   const g = db.goals;
   const { start, unit } = periodRange(state.period);
   const inP = (x) => x.date >= start;
-  const runs = db.runs.filter(inP), meals = db.meals.filter(inP), sleep = db.sleep.filter(inP);
+  const runs = db.runs.filter(inP), meals = db.meals.filter(inP), sleep = db.sleep.filter(inP), caf = db.caffeine.filter(inP);
+  const cafDays = new Set(caf.map((x) => x.date)).size;
   const body = db.body.filter(inP).sort(byDateAsc);
   const timed = runs.filter((r) => r.sec && r.km);
   const buckets = bucketList(start, unit);
@@ -1607,7 +1767,15 @@ function viewSummary() {
   const months = bucketList(unit === "month" ? start : start.slice(0, 8) + "01", "month").reverse();
   const mRuns = groupBy(db.runs, "month"), mMeals = groupBy(db.meals, "month"), mSleep = groupBy(db.sleep, "month"), mBody = groupBy([...db.body].sort(byDateAsc), "month");
 
-  const empty = !runs.length && !meals.length && !sleep.length && !body.length;
+  const empty = !runs.length && !meals.length && !sleep.length && !body.length && !caf.length;
+  const cafBy = groupBy(caf, unit);
+  const cafData = buckets.map((b) => {
+    const list = cafBy.get(b.key) || [];
+    const days = new Set(list.map((x) => x.date)).size;
+    const v = days ? sum(list, "mg") / days : 0;
+    return { label: b.label, value: v, tip: `${capitalize(b.long)} · ${v ? `${fmt0(v)} mg/día` : "sin registros"}` };
+  });
+  const mCaf = groupBy(db.caffeine, "month");
 
   return [
     h("div", { class: "seg period", role: "radiogroup", "aria-label": "Período" },
@@ -1628,6 +1796,8 @@ function viewSummary() {
         stat(sleep.length ? fmt1(avgOf(sleep, "hours")) : "—", "h", "Sueño medio", `Objetivo ${fmt1(g.sleep)} h`),
         stat(lastW ? fmt1(lastW.weight) : "—", "kg", "Peso", body.length > 1 ? `${fmtDelta(lastW.weight - firstW.weight, "kg")} en el período` : null),
         stat(bmi ? fmt1(bmi) : "—", "", "IMC", bmi ? capitalize(bmiLabel(bmi)) : null),
+        stat(cafDays ? fmt0(sum(caf, "mg") / cafDays) : "—", "mg", "Cafeína por día", `Límite ${fmt0(g.caffeine)} mg`),
+        stat(cafDays ? fmt1(termosOf(caf) / cafDays) : "—", "", "Termos de mate por día", cafDays ? `${fmt1(termosOf(caf))} en total` : null),
         stat(fatList.length ? fmt1(fatList.at(-1).fat) : "—", "%", "Grasa corporal", fatList.length > 1 ? `${fmtDelta(fatList.at(-1).fat - fatList[0].fat, "pts")} en el período` : null))),
 
     h("section", { class: "card", "aria-label": `Kilómetros por ${per}` },
@@ -1661,6 +1831,13 @@ function viewSummary() {
         goal: g.kcal, goalLabel: `objetivo ${fmt0(g.kcal)}`, ariaLabel: `Calorías medias por día en cada ${per}`,
       })),
 
+    caf.length > 0 && h("section", { class: "card", "aria-label": `Cafeína por día en cada ${per}` },
+      h("div", { class: "card-head" }, h("h2", {}, "Cafeína por día"), h("span", { class: "muted" }, `media de cada ${per}`)),
+      barChart({
+        data: cafData, color: "var(--chart-caffeine)", width: W, fmt: (v) => fmt0(v),
+        goal: g.caffeine, goalLabel: `límite ${fmt0(g.caffeine)} mg`, ariaLabel: `Cafeína media por día en cada ${per}`,
+      })),
+
     sleep.length > 0 && h("section", { class: "card", "aria-label": `Sueño medio por ${per}` },
       h("div", { class: "card-head" }, h("h2", {}, "Horas de sueño"), h("span", { class: "muted" }, `media de cada ${per}`)),
       barChart({
@@ -1683,7 +1860,7 @@ function viewSummary() {
         h("table", { class: "table" },
           h("thead", {}, h("tr", {},
             h("th", { scope: "col" }, "Mes"), h("th", { scope: "col", class: "n" }, "Km"), h("th", { scope: "col", class: "n" }, "Carreras"),
-            h("th", { scope: "col", class: "n" }, "Kcal/día"), h("th", { scope: "col", class: "n" }, "Sueño"), h("th", { scope: "col", class: "n" }, "Peso"))),
+            h("th", { scope: "col", class: "n" }, "Kcal/día"), h("th", { scope: "col", class: "n" }, "Cafeína/día"), h("th", { scope: "col", class: "n" }, "Sueño"), h("th", { scope: "col", class: "n" }, "Peso"))),
           h("tbody", {}, months.map((m) => {
             const r = mRuns.get(m.key) || [], ml = mMeals.get(m.key) || [], sl = mSleep.get(m.key) || [], bd = mBody.get(m.key) || [];
             return h("tr", {},
@@ -1691,6 +1868,7 @@ function viewSummary() {
               h("td", { class: "n" }, r.length ? fmt1(sum(r, "km")) : "—"),
               h("td", { class: "n" }, r.length || "—"),
               h("td", { class: "n" }, ml.length ? fmt0(kcalPerDay(ml)) : "—"),
+              h("td", { class: "n" }, (() => { const cf = mCaf.get(m.key) || []; const dd = new Set(cf.map((x) => x.date)).size; return dd ? `${fmt0(sum(cf, "mg") / dd)} mg` : "—"; })()),
               h("td", { class: "n" }, sl.length ? `${fmt1(avgOf(sl, "hours"))} h` : "—"),
               h("td", { class: "n" }, bd.length ? `${fmt1(bd.at(-1).weight)} kg` : "—"));
           }))))),

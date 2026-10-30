@@ -34,7 +34,7 @@ end $$;
 create table if not exists public.profiles (
   id                text primary key check (id ~ '^[a-z]{2,20}$'),
   name              text not null,
-  goals             jsonb not null default '{"kcal":2200,"p":140,"c":250,"f":70,"sleep":8,"km":30}',
+  goals             jsonb not null default '{"kcal":2200,"p":140,"c":250,"f":70,"sleep":8,"km":30,"caffeine":400}',
   height_cm         numeric(5,1) check (height_cm is null or height_cm between 100 and 250),
   prefs             jsonb not null default '{}',     -- { "accent": "rosa", "mode": "system" }
   strava_athlete_id bigint unique,
@@ -125,6 +125,22 @@ create table if not exists public.body_metrics (
 );
 create index if not exists body_metrics_profile_date on public.body_metrics (profile_id, date desc);
 
+-- ---------- Mate, café y cafeína ----------
+create table if not exists public.caffeine (
+  id          uuid primary key default gen_random_uuid(),
+  profile_id  text not null references public.profiles (id) on delete cascade,
+  date        date not null,
+  time        time not null default '09:00',
+  kind        text not null default 'mate' check (kind in ('mate', 'cafe', 'te', 'energizante', 'otro')),
+  amount      numeric(5,2) not null default 1 check (amount > 0),   -- termos, tazas o latas
+  yerba       text not null default '',
+  yerba_g     numeric(6,1),
+  description text not null default '',
+  caffeine_mg numeric(7,1) not null default 0 check (caffeine_mg >= 0),
+  created_at  timestamptz not null default now()
+);
+create index if not exists caffeine_profile_date on public.caffeine (profile_id, date);
+
 -- ---------- Plan semanal: qué receta se come cada día ----------
 create table if not exists public.meal_plan (
   id         uuid primary key default gen_random_uuid(),
@@ -164,12 +180,13 @@ alter table public.recipes       enable row level security;
 alter table public.meals         enable row level security;
 alter table public.sleep         enable row level security;
 alter table public.body_metrics  enable row level security;
+alter table public.caffeine      enable row level security;
 alter table public.meal_plan     enable row level security;
 alter table public.shopping_lists enable row level security;
 alter table public.strava_tokens enable row level security;
 
 revoke all on public.profiles, public.runs, public.recipes, public.meals, public.sleep,
-  public.body_metrics, public.meal_plan, public.shopping_lists, public.strava_tokens from anon, authenticated;
+  public.body_metrics, public.caffeine, public.meal_plan, public.shopping_lists, public.strava_tokens from anon, authenticated;
 
 -- que la API de Supabase vea las tablas nuevas sin esperar
 notify pgrst, 'reload schema';

@@ -10,6 +10,7 @@ App móvil privada (PWA instalable) para **Sofi y Flor**: carreras, comidas, rec
 - **Comidas**: macros a mano, desde una receta o estimados por IA a partir de una descripción («2 huevos y una tostada con aguacate»).
 - **Recetas**: ingredientes con cantidades; la IA calcula los macros totales y por porción. **Las recetas son compartidas** entre Sofi y Flor.
 - **Semana**: planificá qué receta comer cada día (momento y porciones), elegí recetas y armá la **lista de compras con IA**, que suma y escala los ingredientes y los ordena por sección del súper; se tacha en el súper y se comparte por WhatsApp. Lo planificado aparece en el diario de cada día para registrarlo con un toque.
+- **Mate y cafeína**: anotá termos de mate (con la yerba y los gramos), cafés, tés o energizantes; la **IA calcula los mg de cafeína** (o se usa una estimación rápida). En Hoy, un **termo animado** se llena con la cafeína del día frente a tu límite (400 mg por defecto, editable) y se pone ámbar si te pasás; en Resumen, cafeína y termos por día, gráfico y columna mes a mes.
 - **Cuerpo**: peso, grasa corporal (%) e **IMC** calculado con tu altura (categorías de la OMS), con gráficos de 90 días, cambio en 30 días y distancia al peso objetivo. Incluye la pestaña de **Sueño**: horas, calidad, media de 7 días y déficit.
 - **Resumen**: todo consolidado por periodo (4 semanas, 3 meses, 12 meses o todo): totales y medias, gráficos frente a tus objetivos, **récords** y una tabla **mes a mes**.
 - **Ajustes**: apariencia de cada perfil (color de acento y modo Sistema, Claro u Oscuro), objetivos, peso objetivo y altura, conexión con Strava, exportar/importar copia, borrar registros y salir.
@@ -27,6 +28,7 @@ Pestañas: Hoy · Correr · Comidas (Diario / Semana / Recetas) · Cuerpo (Peso 
 | Datos (leer y guardar) | `netlify/functions/data.mjs` → `POST /api/data` |
 | IA de macros (Claude) | `netlify/functions/macros.mjs` → `POST /api/macros` |
 | IA de lista de compras (Claude) | `netlify/functions/shopping.mjs` → `POST /api/shopping` |
+| IA de cafeína (Claude) | `netlify/functions/caffeine.mjs` → `POST /api/caffeine` |
 | Strava: conectar y sincronizar | `netlify/functions/strava-*.mjs` → `/api/strava/*` |
 | Base de datos | Supabase — esquema en `supabase/schema.sql` |
 
