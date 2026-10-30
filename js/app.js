@@ -180,36 +180,52 @@ async function estimateMacros(text, servings) {
 
 /** Caja "Calcular con IA": textarea + botón + tabla de resultados.
     onResult recibe { items, total, notes }. */
-function aiBox({ label, placeholder, text = "", items = [], getServings, onResult, hint }) {
+function aiBox({ label, placeholder, text = "", items = [], getServings, onResult, onEdit, hint }) {
   const ta = h("textarea", { placeholder, rows: 4 });
   ta.value = text;
   const out = h("div", { class: "ai-result" });
   const btn = h("button", { type: "button", class: "btn ai block", icon: "spark" }, "Calcular macros con IA");
 
+  // desglose editable: cada alimento con sus kcal y macros; al cambiar un valor o quitar
+  // un alimento se recalcula el total y se avisa con onEdit(items, total)
+  const MACROS = [["kcal", "kcal"], ["p", "Prot. (g)"], ["c", "Carb. (g)"], ["f", "Grasa (g)"]];
+  const totalOf = (list) => Object.fromEntries(MACROS.map(([k]) => [k, sum(list, k)]));
   const render = (data) => {
     out.replaceChildren();
-    if (!data?.items?.length) return;
+    const list = (data?.items || []).map((i) => ({ ...i }));
+    if (!list.length) return;
+    const totals = Object.fromEntries(MACROS.map(([k]) => [k, h("b", { class: "num" })]));
+    const paintTotals = () => {
+      const t = totalOf(list);
+      MACROS.forEach(([k]) => { totals[k].textContent = k === "kcal" ? fmt0(t[k]) : fmt1(t[k]); });
+      return t;
+    };
+    const changed = () => onEdit?.(list.map((i) => ({ ...i })), paintTotals());
+
     out.append(
-      h("table", {},
-        h("thead", {}, h("tr", {},
-          h("th", {}, "Ingrediente"), h("th", { class: "n" }, "kcal"),
-          h("th", { class: "n" }, "P"), h("th", { class: "n" }, "C"), h("th", { class: "n" }, "G"))),
-        h("tbody", {}, data.items.map((i) => h("tr", {},
-          h("td", {}, i.name, i.quantity && h("div", { class: "hint" }, i.quantity)),
-          h("td", { class: "n" }, fmt0(i.kcal)), h("td", { class: "n" }, fmt1(i.p)),
-          h("td", { class: "n" }, fmt1(i.c)), h("td", { class: "n" }, fmt1(i.f))))),
-        h("tfoot", {}, h("tr", {},
-          h("td", {}, "Total"), h("td", { class: "n" }, fmt0(sum(data.items, "kcal"))),
-          h("td", { class: "n" }, fmt1(sum(data.items, "p"))), h("td", { class: "n" }, fmt1(sum(data.items, "c"))),
-          h("td", { class: "n" }, fmt1(sum(data.items, "f"))))),
-      ),
+      h("p", { class: "hint ai-edit-hint" }, "Podés corregir cualquier valor o quitar un alimento: el total se recalcula solo."),
+      h("ul", { class: "ai-items" }, list.map((item, idx) => h("li", { class: "ai-item" },
+        h("div", { class: "ai-item-head" },
+          h("span", { class: "item-main" }, h("strong", {}, item.name || "Alimento"), item.quantity && h("span", { class: "hint" }, ` · ${item.quantity}`)),
+          h("button", {
+            type: "button", class: "icon-btn ai-remove", "aria-label": `Quitar ${item.name || "alimento"}`, icon: "close",
+            onclick: () => { list.splice(idx, 1); render({ ...data, items: list }); onEdit?.(list.map((i) => ({ ...i })), totalOf(list)); },
+          })),
+        h("div", { class: "ai-item-values" }, MACROS.map(([k, label]) => {
+          const input = numInput(`${k}-${idx}`, k === "kcal" ? Math.round(item[k] || 0) : round1(item[k] || 0), { int: k === "kcal", label: `${label} de ${item.name}` });
+          input.addEventListener("input", () => { item[k] = readNum(input); changed(); });
+          return h("label", { class: "ai-cell" }, h("span", {}, label), input);
+        }))))),
+      h("div", { class: "ai-total" }, h("span", {}, "Total"),
+        h("span", { class: "ai-total-values" }, MACROS.map(([k, label]) => h("span", {}, totals[k], " ", label.split(" ")[0])))),
       data.notes && h("p", { class: "ai-note" }, data.notes),
     );
+    paintTotals();
   };
 
   btn.addEventListener("click", async () => {
     const q = ta.value.trim();
-    if (!q) { ta.focus(); toast("Describe primero los alimentos o ingredientes"); return; }
+    if (!q) { ta.focus(); toast("Primero describí los alimentos o ingredientes"); return; }
     btn.disabled = true;
     btn.lastChild.textContent = "Calculando…";
     out.replaceChildren();
@@ -247,7 +263,7 @@ function macroFields(values = {}) {
   const el = h("div", {},
     h("div", { class: "row" },
       field("Proteína (g)", p), field("Carbos (g)", c), field("Grasas (g)", f)),
-    field("Calorías (kcal)", kcal, "Se calculan solas a partir de los macros (4/4/9 kcal por gramo) si no las escribes."),
+    field("Calorías (kcal)", kcal, "Se calculan solas a partir de los macros (4/4/9 kcal por gramo) si no las escribís."),
   );
   return {
     el,
@@ -280,7 +296,7 @@ function confirmButton(label, confirmLabel, onConfirm, cls = "btn danger") {
 
 function formActions(onDelete, saveLabel = "Guardar") {
   return h("div", { class: "actions" },
-    onDelete && confirmButton("Eliminar", "¿Seguro? Toca otra vez", onDelete),
+    onDelete && confirmButton("Eliminar", "¿Seguro? Tocá de nuevo", onDelete),
     h("button", { type: "submit", class: "btn primary" }, saveLabel),
   );
 }
@@ -321,7 +337,7 @@ function runForm(rec) {
   const form = sheetForm((f) => {
     const d = readNum(km), s = secs();
     km.setAttribute("aria-invalid", d > 0 ? "false" : "true");
-    if (!d) { km.focus(); toast("Indica los kilómetros"); return; }
+    if (!d) { km.focus(); toast("Indicá los kilómetros"); return; }
     upsert("runs", { id: r.id || uid(), date: date.value || todayISO(), km: d, sec: s, type: checked(f, "type"), notes: notes.value.trim() });
     closeSheet(); toast(rec ? "Carrera actualizada" : "Carrera guardada"); render();
   },
@@ -338,7 +354,7 @@ function runForm(rec) {
   openSheet(rec ? "Editar carrera" : "Nueva carrera", form);
 }
 
-const SLOTS = [["desayuno", "Desayuno"], ["comida", "Comida"], ["merienda", "Merienda"], ["cena", "Cena"], ["snack", "Snack"]];
+const SLOTS = [["desayuno", "Desayuno"], ["comida", "Almuerzo"], ["merienda", "Merienda"], ["cena", "Cena"], ["snack", "Snack"]];
 function guessSlot() {
   const hr = new Date().getHours();
   return hr < 11 ? "desayuno" : hr < 16 ? "comida" : hr < 19 ? "merienda" : hr < 23 ? "cena" : "snack";
@@ -346,7 +362,7 @@ function guessSlot() {
 
 function mealForm(rec, preset = {}) {
   const m = rec || { date: preset.date || todayISO(), time: nowTime(), slot: guessSlot(), name: "", recipeId: preset.recipeId || "", servings: 1, items: [], desc: "" };
-  const name = h("input", { type: "text", name: "name", value: m.name, placeholder: "Ej. Avena con plátano", autocomplete: "off" });
+  const name = h("input", { type: "text", name: "name", value: m.name, placeholder: "Ej. Avena con banana", autocomplete: "off" });
   const date = h("input", { type: "date", name: "date", value: m.date, required: true });
   const time = h("input", { type: "time", name: "time", value: m.time });
   const macros = macroFields(m);
@@ -377,10 +393,11 @@ function mealForm(rec, preset = {}) {
     : null;
 
   const ai = aiBox({
-    label: "Describe lo que comiste",
-    placeholder: "Ej. 2 huevos revueltos, 1 tostada integral con aguacate y un café con leche",
-    hint: "Incluye cantidades si las sabes (gramos, unidades, tazas). La IA estima el resto.",
+    label: "Describí lo que comiste",
+    placeholder: "Ej. 2 huevos revueltos, 1 tostada integral con palta y un café con leche",
+    hint: "Poné las cantidades si las sabés (gramos, unidades, tazas). La IA estima el resto.",
     text: desc, items,
+    onEdit: (list, total) => { items = list; macros.set(total); },
     onResult: (data) => {
       items = data.items; desc = data.text;
       macros.set(data.total);
@@ -391,7 +408,7 @@ function mealForm(rec, preset = {}) {
 
   const form = sheetForm((f) => {
     const v = macros.read();
-    if (!v.kcal && !v.p && !v.c && !v.f) { toast("Añade macros: a mano, desde una receta o con IA"); return; }
+    if (!v.kcal && !v.p && !v.c && !v.f) { toast("Agregá los macros: a mano, desde una receta o con IA"); return; }
     upsert("meals", {
       id: m.id || uid(), date: date.value || todayISO(), time: time.value || nowTime(),
       slot: checked(f, "slot"), name: name.value.trim() || "Comida",
@@ -434,16 +451,17 @@ function recipeForm(rec) {
 
   const ai = aiBox({
     label: "Ingredientes (uno por línea)",
-    placeholder: "400 g lentejas secas\n1 cebolla\n2 zanahorias\n1 pimiento rojo\n2 cdas aceite de oliva\n1 chorizo (100 g)",
-    hint: "Pon la cantidad de la receta completa. Luego se divide entre las porciones.",
+    placeholder: "400 g lentejas secas\n1 cebolla\n2 zanahorias\n1 morrón rojo\n2 cdas aceite de oliva\n1 chorizo (100 g)",
+    hint: "Poné la cantidad de la receta completa. Después se divide por las porciones.",
     text: ingredients, items,
     getServings: () => readNum(servings) || 1,
+    onEdit: (list, total) => { items = list; macros.set(total); updatePer(); },
     onResult: (data) => { items = data.items; ingredients = data.text; macros.set(data.total); updatePer(); },
   });
 
   const form = sheetForm(() => {
     const v = macros.read();
-    if (!name.value.trim()) { name.focus(); toast("Ponle nombre a la receta"); return; }
+    if (!name.value.trim()) { name.focus(); toast("Ponele un nombre a la receta"); return; }
     const saved = upsert("recipes", {
       id: r.id || uid(), name: name.value.trim(), servings: readNum(servings) || 1,
       ingredients: ai.querySelector("textarea").value.trim() || ingredients, items,
@@ -489,7 +507,7 @@ function sleepForm(rec) {
   bed.addEventListener("input", update); wake.addEventListener("input", update); update();
 
   const form = sheetForm((f) => {
-    if (!bed.value || !wake.value) { toast("Indica a qué hora te acostaste y te levantaste"); return; }
+    if (!bed.value || !wake.value) { toast("Indicá a qué hora te acostaste y te levantaste"); return; }
     upsert("sleep", {
       id: s.id || uid(), date: date.value || todayISO(), bed: bed.value, wake: wake.value,
       hours: sleepHours(bed.value, wake.value), quality: Number(checked(f, "quality")) || 3, notes: notes.value.trim(),
@@ -541,7 +559,7 @@ function bodyForm(rec) {
     const cm = height ? readNum(height) : account.profile?.height_cm;
     const bmi = cm && kg ? kg / (cm / 100) ** 2 : 0;
     bmiOut.textContent = bmi ? fmt1(bmi) : "—";
-    bmiCat.textContent = bmi ? bmiLabel(bmi) : height ? "Indica tu altura" : "";
+    bmiCat.textContent = bmi ? bmiLabel(bmi) : height ? "Indicá tu altura" : "";
   };
   [weight, height].filter(Boolean).forEach((i) => i.addEventListener("input", update));
   update();
@@ -549,7 +567,7 @@ function bodyForm(rec) {
   const form = sheetForm(() => {
     const kg = readNum(weight);
     weight.setAttribute("aria-invalid", kg >= 20 ? "false" : "true");
-    if (kg < 20 || kg > 400) { weight.focus(); toast("Indica tu peso en kg"); return; }
+    if (kg < 20 || kg > 400) { weight.focus(); toast("Indicá tu peso en kg"); return; }
     const pct = readNum(fat);
     if (pct && (pct < 2 || pct > 75)) { fat.focus(); toast("La grasa corporal va entre 2 y 75 %"); return; }
     if (height && readNum(height)) setHeight(readNum(height));
@@ -573,62 +591,62 @@ function bodyForm(rec) {
 // cada tema: [título, pasos, consejo opcional]; los pasos usan los nombres que se ven en pantalla
 const GUIDE = [
   ["Primeros pasos", [
-    "Entra con tu usuario (sofi o flor) y tu contraseña. El móvil la recuerda: solo se pide la primera vez.",
-    "Instala la app: en iPhone, Safari → Compartir → «Añadir a pantalla de inicio»; en Android, Chrome → menú ⋮ → «Instalar app».",
-    "Toca tu inicial (arriba a la derecha) para abrir Ajustes.",
-    "En «Objetivos diarios» pon tus calorías, macros, horas de sueño, km por semana, tu altura y, si quieres, tu peso objetivo. Pulsa «Guardar objetivos».",
-    "En «Apariencia» elige tu color y el modo Claro, Oscuro o Sistema.",
+    "Entrá con tu usuario (sofi o flor) y tu contraseña. El celular la recuerda: solo se pide la primera vez.",
+    "Instalá la app: en iPhone, Safari → Compartir → «Agregar a pantalla de inicio»; en Android, Chrome → menú ⋮ → «Instalar app».",
+    "Tocá tu inicial (arriba a la derecha) para abrir Ajustes.",
+    "En «Objetivos diarios» poné tus calorías, macros, horas de sueño, km por semana, tu altura y, si querés, tu peso objetivo. Tocá «Guardar objetivos».",
+    "En «Apariencia» elegí tu color y el modo Claro, Oscuro o Sistema.",
   ]],
   ["Conectar Garmin con Strava", [
-    "En el móvil, abre Garmin Connect → Ajustes → Aplicaciones conectadas → Strava, y conéctalo. Desde ahí cada actividad del reloj llega sola a Strava.",
+    "En el celular, abrí Garmin Connect → Ajustes → Aplicaciones conectadas → Strava, y conectalo. Desde ahí cada actividad del reloj llega sola a Strava.",
     "En esta app: Ajustes → «Conectar con Strava» → «Autorizar».",
-    "Al volver verás «Strava conectado» y se importan tus carreras.",
-    "Desde entonces, las carreras nuevas entran solas al abrir la app (cada 3 horas) o al pulsar «Sincronizar» en Ajustes.",
+    "Al volver vas a ver «Strava conectado» y se importan tus carreras.",
+    "Desde entonces, las carreras nuevas entran solas al abrir la app (cada 3 horas) o al tocar «Sincronizar» en Ajustes.",
   ], "Solo se importan carreras (también trail y cinta), no bici ni otros deportes. Lo que edites en una carrera importada no se pisa al sincronizar."],
   ["Registrar una carrera a mano", [
-    "Ve a la pestaña Correr y pulsa «+ Carrera».",
-    "Escribe los kilómetros (puedes usar coma: 5,2) y el tiempo en horas, minutos y segundos. El ritmo por km se calcula solo.",
-    "Elige el tipo (suave, tempo, series, largo o carrera), añade notas si quieres y pulsa «Guardar».",
-    "Para cambiarla, tócala en el historial. Para borrarla, pulsa «Eliminar» dos veces.",
+    "Andá a la pestaña Correr y tocá «+ Carrera».",
+    "Escribí los kilómetros (podés usar coma: 5,2) y el tiempo en horas, minutos y segundos. El ritmo por km se calcula solo.",
+    "Elegí el tipo (suave, tempo, series, largo o carrera), agregá notas si querés y tocá «Guardar».",
+    "Para cambiarla, tocala en el historial. Para borrarla, tocá «Eliminar» dos veces.",
   ]],
-  ["Registrar lo que comes", [
-    "Ve a Comidas y pulsa «+ Comida». Elige el momento del día.",
-    "Opción 1, con IA: describe lo que comiste con cantidades si las sabes («2 huevos y una tostada con aguacate») y pulsa «Calcular macros con IA».",
-    "Opción 2, desde una receta: elígela en «Desde una receta» e indica cuántas porciones comiste.",
-    "Opción 3, a mano: escribe proteína, carbohidratos y grasas; las calorías se calculan solas.",
-    "Revisa los números y pulsa «Guardar». Con las flechas de arriba cambias de día.",
-  ], "Los cálculos de la IA son aproximados: si tienes la etiqueta del producto, ajusta los valores."],
+  ["Registrar lo que comés", [
+    "Andá a Comidas y tocá «+ Comida». Elegí el momento del día.",
+    "Opción 1, con IA: describí lo que comiste, con cantidades si las sabés («2 huevos y una tostada con palta»), y tocá «Calcular macros con IA».",
+    "Opción 2, desde una receta: elegila en «Desde una receta» e indicá cuántas porciones comiste.",
+    "Opción 3, a mano: escribí proteína, carbohidratos y grasas; las calorías se calculan solas.",
+    "Revisá los números y tocá «Guardar». Con las flechas de arriba cambiás de día.",
+  ], "Los cálculos de la IA son aproximados: podés corregir cada alimento o el total. Para editar una comida o pasarla a otro momento (por ejemplo, de cena a merienda), tocala en el diario."],
   ["Guardar tus recetas", [
-    "En Comidas, toca la pestaña «Recetas» y luego «+ Receta».",
-    "Pon el nombre y cuántas porciones salen.",
-    "Escribe los ingredientes, uno por línea, con la cantidad de la receta completa («400 g lentejas»).",
-    "Pulsa «Calcular macros con IA» y luego «Guardar». La app muestra las calorías y macros por porción.",
-    "Para comer una porción, abre la receta y pulsa «Registrar una porción hoy».",
+    "En Comidas, tocá la pestaña «Recetas» y después «+ Receta».",
+    "Poné el nombre y cuántas porciones salen.",
+    "Escribí los ingredientes, uno por línea, con la cantidad de la receta completa («400 g de lentejas»).",
+    "Tocá «Calcular macros con IA» y después «Guardar». La app muestra las calorías y los macros por porción.",
+    "Para comer una porción, abrí la receta y tocá «Registrar una porción hoy».",
   ], "Las recetas son compartidas: las que guarda una, la otra también las ve."],
   ["Peso, IMC y grasa", [
-    "Ve a Cuerpo y pulsa «+ Peso».",
-    "Escribe tu peso y, si tu báscula la mide, tu grasa corporal (%). La primera vez te pide tu altura para calcular el IMC.",
-    "Pulsa «Guardar». Verás tu evolución de 90 días y cuánto te falta para tu peso objetivo.",
-  ], "Pésate siempre en condiciones parecidas (por ejemplo, en ayunas) para comparar mejor. El IMC no distingue músculo de grasa."],
+    "Andá a Cuerpo y tocá «+ Peso».",
+    "Escribí tu peso y, si tu balanza la mide, tu grasa corporal (%). La primera vez te pide tu altura para calcular el IMC.",
+    "Tocá «Guardar». Vas a ver tu evolución de 90 días y cuánto te falta para tu peso objetivo.",
+  ], "Pesate siempre en condiciones parecidas (por ejemplo, en ayunas) para comparar mejor. El IMC no distingue músculo de grasa."],
   ["Sueño", [
-    "En Cuerpo, toca la pestaña «Sueño» y luego «+ Sueño».",
-    "Indica a qué hora te acostaste y a qué hora te levantaste; las horas se calculan solas, aunque cruces la medianoche.",
-    "Elige la calidad del 1 al 5 y pulsa «Guardar».",
+    "En Cuerpo, tocá la pestaña «Sueño» y después «+ Sueño».",
+    "Indicá a qué hora te acostaste y a qué hora te levantaste; las horas se calculan solas, aunque pases la medianoche.",
+    "Elegí la calidad del 1 al 5 y tocá «Guardar».",
   ]],
   ["Ver tu progreso", [
     "Hoy: tus calorías restantes, los km de la semana, tus horas de sueño y tus macros del día.",
-    "Resumen: elige el periodo (4 semanas, 3 meses, 12 meses o todo) y verás totales, gráficos frente a tus objetivos, tus récords y una tabla mes a mes.",
-    "En los gráficos, toca una barra o un punto para ver el valor exacto.",
+    "Resumen: elegí el período (4 semanas, 3 meses, 12 meses o todo) y vas a ver totales, gráficos frente a tus objetivos, tus récords y una tabla mes a mes.",
+    "En los gráficos, tocá una barra o un punto para ver el valor exacto.",
   ]],
   ["Copia de seguridad y salir", [
     "Ajustes → «Exportar» guarda un archivo con todos tus datos. «Importar» los recupera.",
-    "Ajustes → «Salir» cierra tu sesión en ese móvil (para entrar con el otro perfil, por ejemplo).",
-  ], "Tus datos se guardan en la nube: si cambias de móvil, entra con tu usuario y aparecen todos."],
+    "Ajustes → «Salir» cierra tu sesión en ese celular (por ejemplo, para entrar con el otro perfil).",
+  ], "Tus datos se guardan en la nube: si cambiás de celular, entrá con tu usuario y aparecen todos."],
 ];
 
 function guideSheet() {
   openSheet("Guía de uso", h("div", { class: "guide" },
-    h("p", { class: "muted" }, "Toca un tema para ver los pasos."),
+    h("p", { class: "muted" }, "Tocá un tema para ver los pasos."),
     GUIDE.map(([title, steps, tip], i) => h("details", { open: i === 0 },
       h("summary", {}, title),
       h("ol", {}, steps.map((st) => h("li", {}, st))),
@@ -639,17 +657,17 @@ function guideSheet() {
 
 // cada paso: vista a mostrar, elemento a iluminar (selector) y texto; sin selector, el paso va centrado
 const TOUR = [
-  { title: "¡Bienvenida a FlorLovesRunning!", text: "Te muestro la app en un minuto. Puedes saltar el tour cuando quieras y repetirlo desde Ajustes." },
+  { title: "¡Bienvenida a FlorLovesRunning!", text: "Te muestro la app en un minuto. Podés saltear el tour cuando quieras y repetirlo desde Ajustes." },
   { view: "today", target: ".rings", title: "Tu día de un vistazo", text: "Calorías que te quedan, kilómetros de la semana frente a tu objetivo y horas de sueño." },
-  { view: "today", target: ".quick", title: "Registrar rápido", text: "Desde aquí apuntas una carrera, una comida, tu peso o tu sueño en dos toques." },
-  { view: "runs", target: ".fab", title: "Correr", text: "Pulsa «+ Carrera» para añadir una a mano: el ritmo por km se calcula solo. Las de tu Garmin llegan solas vía Strava." },
-  { view: "meals", target: ".fab", title: "Comidas", text: "Pulsa «+ Comida», describe lo que comiste y toca «Calcular macros con IA». También puedes elegir una receta o escribir los macros." },
-  { view: "meals", target: ".subnav", title: "Recetas compartidas", text: "En «Recetas» guardas tus platos con sus ingredientes; la IA calcula los macros por porción. Las ven las dos." },
-  { view: "body", target: ".fab", title: "Peso, IMC y grasa", text: "Pulsa «+ Peso» para apuntar tu peso y, si la tienes, tu grasa corporal. El IMC se calcula con tu altura." },
+  { view: "today", target: ".quick", title: "Registrar rápido", text: "Desde acá anotás una carrera, una comida, tu peso o tu sueño en dos toques." },
+  { view: "runs", target: ".fab", title: "Correr", text: "Tocá «+ Carrera» para cargar una a mano: el ritmo por km se calcula solo. Las de tu Garmin llegan solas vía Strava." },
+  { view: "meals", target: ".fab", title: "Comidas", text: "Tocá «+ Comida», describí lo que comiste y tocá «Calcular macros con IA». También podés elegir una receta o escribir los macros. Para corregir una comida o cambiarla de momento, tocala." },
+  { view: "meals", target: ".subnav", title: "Recetas compartidas", text: "En «Recetas» guardás tus platos con sus ingredientes; la IA calcula los macros por porción. Las ven las dos." },
+  { view: "body", target: ".fab", title: "Peso, IMC y grasa", text: "Tocá «+ Peso» para anotar tu peso y, si la tenés, tu grasa corporal. El IMC se calcula con tu altura." },
   { view: "body", target: ".subnav", title: "Sueño", text: "En esta misma pantalla, la pestaña «Sueño» guarda a qué hora te acostaste, a qué hora te levantaste y cómo dormiste." },
-  { view: "summary", target: ".period", title: "Resumen", text: "Elige el periodo y verás tus totales, gráficos frente a tus objetivos, récords y una tabla mes a mes." },
-  { view: "today", target: "#settingsBtn", title: "Ajustes", text: "Aquí pones tus objetivos, eliges color y modo oscuro y, muy importante, conectas Strava para traer tus carreras del Garmin." },
-  { title: "¡Lista para empezar!", text: "Te recomiendo empezar por Ajustes: pon tus objetivos y conecta Strava. La guía escrita también está ahí.", finish: "Ir a Ajustes" },
+  { view: "summary", target: ".period", title: "Resumen", text: "Elegí el período y vas a ver tus totales, gráficos frente a tus objetivos, récords y una tabla mes a mes." },
+  { view: "today", target: "#settingsBtn", title: "Ajustes", text: "Acá ponés tus objetivos, elegís color y modo oscuro y, muy importante, conectás Strava para traer tus carreras del Garmin." },
+  { title: "¡Lista para empezar!", text: "Te recomiendo empezar por Ajustes: poné tus objetivos y conectá Strava. La guía escrita también está ahí.", finish: "Ir a Ajustes" },
 ];
 
 const tourKey = () => `flr:tour-visto:${account.user?.id}`;
@@ -746,7 +764,7 @@ function settingsSheet() {
       closeSheet(); toast("Datos importados"); render();
     } catch (err) {
       console.error(err);
-      toast(err instanceof SyntaxError ? "El archivo no es una copia válida de FlorLovesRunning" : "No se pudo importar. Inténtalo de nuevo.");
+      toast(err instanceof SyntaxError ? "El archivo no es una copia válida de FlorLovesRunning" : "No se pudo importar. Probá de nuevo.");
     }
   });
 
@@ -758,11 +776,11 @@ function settingsSheet() {
         h("strong", {}, linked ? "Strava conectado" : "Strava"),
         h("p", { class: "muted" }, linked
           ? (prof.strava_synced_at ? `Última sincronización: ${new Date(prof.strava_synced_at).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" })}` : "Aún sin sincronizar")
-          : "Conéctalo para que las carreras de tu Garmin lleguen solas a la app."))),
+          : "Conectalo para que las carreras de tu Garmin lleguen solas a la app."))),
     linked
       ? h("div", { class: "actions" },
           h("button", { type: "button", class: "btn ghost", onclick: (e) => syncStrava({ button: e.currentTarget }) }, "Sincronizar"),
-          confirmButton("Desconectar", "¿Seguro? Toca otra vez", disconnectStrava, "btn danger"))
+          confirmButton("Desconectar", "¿Seguro? Tocá de nuevo", disconnectStrava, "btn danger"))
       : h("button", { type: "button", class: "btn strava-btn block", icon: "strava", onclick: connectStrava }, "Conectar con Strava"),
   );
 
@@ -794,14 +812,14 @@ function settingsSheet() {
 
     h("h3", { class: "section-title" }, "Tus datos"),
     h("p", { class: "muted", style: "margin-bottom:12px" },
-      "Se guardan en la nube y los ves en cualquier dispositivo con tu cuenta. Las recetas son compartidas entre Sofi y Flor; el resto es privado."),
+      "Se guardan en la nube y los ves en cualquier celular con tu cuenta. Las recetas son compartidas entre Sofi y Flor; el resto es privado."),
     h("div", { class: "actions" },
       h("button", { type: "button", class: "btn ghost", onclick: downloadBackup }, "Exportar"),
       h("button", { type: "button", class: "btn ghost", onclick: () => fileIn.click() }, "Importar")),
     fileIn,
-    confirmButton("Borrar mis registros", "Se borrarán carreras, comidas y sueño. Toca otra vez", async () => {
+    confirmButton("Borrar mis registros", "Se borran carreras, comidas y sueño. Tocá de nuevo", async () => {
       try { await wipe(); closeSheet(); toast("Registros borrados"); render(); }
-      catch { toast("No se pudieron borrar. Inténtalo de nuevo."); }
+      catch { toast("No se pudieron borrar. Probá de nuevo."); }
     }, "btn danger block wipe"),
     h("p", { class: "hint", style: "margin-top:24px" },
       "Las estimaciones de la IA son aproximadas: revísalas y ajústalas si conoces los valores exactos de la etiqueta."),
@@ -1080,7 +1098,7 @@ function viewToday() {
             stat(fmt1(lastBody.weight), "kg", "Peso", dayLabel(lastBody.date)),
             stat(lastBmi ? fmt1(lastBmi) : "—", "", "IMC", lastBmi ? capitalize(bmiLabel(lastBmi)) : "Falta tu altura"),
             stat(lastBody.fat ? fmt1(lastBody.fat) : "—", "%", "Grasa corporal"))
-        : h("p", { class: "muted" }, "Registra tu peso para ver tu IMC y su evolución.")),
+        : h("p", { class: "muted" }, "Registrá tu peso para ver tu IMC y su evolución.")),
     h("section", { class: "card", "aria-label": "Registro rápido" },
       h("div", { class: "card-head" }, h("h2", {}, "Registrar")),
       h("div", { class: "quick" },
@@ -1094,7 +1112,7 @@ function viewToday() {
         h("button", { type: "button", class: "link", onclick: () => go("meals") }, "Ver todo")),
       meals.length
         ? h("ul", { class: "list" }, meals.map(mealItem))
-        : emptyState("meals", "Aún no has registrado comidas", "Describe lo que comiste y la IA calcula los macros.")),
+        : emptyState("meals", "Todavía no registraste comidas", "Describí lo que comiste y la IA calcula los macros.")),
   ];
 }
 
@@ -1123,7 +1141,7 @@ function viewRuns() {
       h("div", { class: "card-head" }, h("h2", {}, "Historial")),
       runs.length
         ? h("ul", { class: "list" }, runs.slice(0, 100).map(runItem))
-        : emptyState("runs", "Sin carreras todavía", "Registra kilómetros y tiempo: calculamos tu ritmo por km.")),
+        : emptyState("runs", "Sin carreras todavía", "Registrá kilómetros y tiempo: calculamos tu ritmo por km.")),
     fab("Carrera", () => runForm()),
   ];
 }
@@ -1145,7 +1163,7 @@ function viewMeals() {
       ? groups.map(([label, list]) => h("section", { class: "card", "aria-label": label },
           h("div", { class: "card-head" }, h("h2", {}, label), h("span", { class: "muted num" }, `${fmt0(sum(list, "kcal"))} kcal`)),
           h("ul", { class: "list" }, list.map(mealItem))))
-      : h("section", { class: "card" }, emptyState("meals", "Nada registrado este día", "Pulsa «Comida» para añadir lo que comiste.")),
+      : h("section", { class: "card" }, emptyState("meals", "Nada registrado este día", "Tocá «Comida» para cargar lo que comiste.")),
     fab("Comida", () => mealForm(null, { date: d })),
   ];
 }
@@ -1155,7 +1173,7 @@ function viewRecipes() {
   return [
     mealsNav("recipes"),
     h("p", { class: "muted", style: "margin-bottom:16px" },
-      "Compartidas entre Sofi y Flor. Guarda tus recetas con sus ingredientes: la IA calcula los macros y luego registras porciones en un toque."),
+      "Compartidas entre Sofi y Flor. Guardá tus recetas con sus ingredientes: la IA calcula los macros y después registrás porciones en un toque."),
     h("section", { class: "card", "aria-label": "Mis recetas" },
       recipes.length
         ? h("ul", { class: "list" }, recipes.map((r) => h("li", { class: "item" },
@@ -1166,7 +1184,7 @@ function viewRecipes() {
                 h("span", { class: "item-sub num" },
                   `${fmt0(r.servings)} porc. · P ${fmt0(r.p / r.servings)} · C ${fmt0(r.c / r.servings)} · G ${fmt0(r.f / r.servings)}`)),
               h("span", { class: "item-end num" }, fmt0(r.kcal / r.servings), h("small", {}, "kcal/porción"))))))
-        : emptyState("recipes", "Aún no tienes recetas", "Añade una con sus ingredientes y cantidades.")),
+        : emptyState("recipes", "Todavía no tenés recetas", "Agregá una con sus ingredientes y cantidades.")),
     fab("Receta", () => recipeForm()),
   ];
 }
@@ -1196,7 +1214,7 @@ function viewSleep() {
       h("div", { class: "card-head" }, h("h2", {}, "Historial")),
       list.length
         ? h("ul", { class: "list" }, list.slice(0, 100).map(sleepItem))
-        : emptyState("sleep", "Sin registros de sueño", "Anota a qué hora te acostaste y te levantaste.")),
+        : emptyState("sleep", "Sin registros de sueño", "Anotá a qué hora te acostaste y te levantaste.")),
     fab("Sueño", () => sleepForm()),
   ];
 }
@@ -1220,7 +1238,7 @@ function viewBody() {
       h("div", { class: "inline-form" }, field("Altura (cm)", input),
         h("button", { type: "button", class: "btn primary", onclick: () => {
           const cm = readNum(input);
-          if (cm < 100 || cm > 250) { input.focus(); toast("Indica tu altura en centímetros"); return; }
+          if (cm < 100 || cm > 250) { input.focus(); toast("Indicá tu altura en centímetros"); return; }
           setHeight(cm); toast("Altura guardada"); render();
         } }, "Guardar")));
   })();
@@ -1235,7 +1253,7 @@ function viewBody() {
             stat(bmi ? fmt1(bmi) : "—", "", "IMC", bmi ? capitalize(bmiLabel(bmi)) : "Falta tu altura"),
             stat(last.fat ? fmt1(last.fat) : "—", "%", "Grasa corporal"),
             g.weight ? stat(fmt1(Math.abs(last.weight - g.weight)), "kg", "Para tu objetivo", Math.abs(last.weight - g.weight) < 0.05 ? "¡Alcanzado!" : `Objetivo ${fmt1(g.weight)} kg`) : null)
-        : emptyState("body", "Sin mediciones todavía", "Registra tu peso y, si la tienes, tu grasa corporal.")),
+        : emptyState("body", "Sin mediciones todavía", "Registrá tu peso y, si la tenés, tu grasa corporal.")),
     recent.length && h("section", { class: "card", "aria-label": "Peso últimos 90 días" },
       h("div", { class: "card-head" }, h("h2", {}, "Peso · 90 días")),
       lineChart({
@@ -1256,7 +1274,7 @@ function viewBody() {
       h("div", { class: "card-head" }, h("h2", {}, "Historial")),
       list.length
         ? h("ul", { class: "list" }, list.slice().reverse().slice(0, 100).map((b, i, arr) => bodyItem(b, arr[i + 1])))
-        : h("p", { class: "muted" }, "Aquí aparecerán tus mediciones.")),
+        : h("p", { class: "muted" }, "Acá van a aparecer tus mediciones.")),
     fab("Peso", () => bodyForm()),
   ];
 }
@@ -1360,25 +1378,25 @@ function viewSummary() {
   const empty = !runs.length && !meals.length && !sleep.length && !body.length;
 
   return [
-    h("div", { class: "seg period", role: "radiogroup", "aria-label": "Periodo" },
+    h("div", { class: "seg period", role: "radiogroup", "aria-label": "Período" },
       PERIODS.map(([k, label]) => h("label", {},
         h("input", { type: "radio", name: "period", value: k, checked: k === state.period, onchange: () => { state.period = k; render(); } }),
         h("span", {}, label)))),
 
     empty
-      ? h("section", { class: "card" }, emptyState("summary", "Nada registrado en este periodo", "Cuando registres carreras, comidas, sueño o peso, aquí verás su evolución."))
+      ? h("section", { class: "card" }, emptyState("summary", "Nada registrado en este período", "Cuando registres carreras, comidas, sueño o peso, acá vas a ver su evolución."))
       : [
-    h("section", { class: "card", "aria-label": "Totales del periodo" },
-      h("div", { class: "card-head" }, h("h2", {}, "En este periodo"), h("span", { class: "muted" }, `desde ${shortDate(start)}`)),
+    h("section", { class: "card", "aria-label": "Totales del período" },
+      h("div", { class: "card-head" }, h("h2", {}, "En este período"), h("span", { class: "muted" }, `desde ${shortDate(start)}`)),
       h("div", { class: "stats" },
         stat(fmt1(sum(runs, "km")), "km", "Distancia", `${runs.length} ${runs.length === 1 ? "carrera" : "carreras"}`),
         stat(timed.length ? fmtDur(sum(timed, "sec") / sum(timed, "km")) : "—", "/km", "Ritmo medio"),
         stat(meals.length ? fmt0(kcalPerDay(meals)) : "—", "kcal", "Calorías por día", `Objetivo ${fmt0(g.kcal)}`),
         stat(meals.length ? fmt0(sum(meals, "p") / new Set(meals.map((m) => m.date)).size) : "—", "g", "Proteína por día", `Objetivo ${fmt0(g.p)} g`),
         stat(sleep.length ? fmt1(avgOf(sleep, "hours")) : "—", "h", "Sueño medio", `Objetivo ${fmt1(g.sleep)} h`),
-        stat(lastW ? fmt1(lastW.weight) : "—", "kg", "Peso", body.length > 1 ? `${fmtDelta(lastW.weight - firstW.weight, "kg")} en el periodo` : null),
+        stat(lastW ? fmt1(lastW.weight) : "—", "kg", "Peso", body.length > 1 ? `${fmtDelta(lastW.weight - firstW.weight, "kg")} en el período` : null),
         stat(bmi ? fmt1(bmi) : "—", "", "IMC", bmi ? capitalize(bmiLabel(bmi)) : null),
-        stat(fatList.length ? fmt1(fatList.at(-1).fat) : "—", "%", "Grasa corporal", fatList.length > 1 ? `${fmtDelta(fatList.at(-1).fat - fatList[0].fat, "pts")} en el periodo` : null))),
+        stat(fatList.length ? fmt1(fatList.at(-1).fat) : "—", "%", "Grasa corporal", fatList.length > 1 ? `${fmtDelta(fatList.at(-1).fat - fatList[0].fat, "pts")} en el período` : null))),
 
     h("section", { class: "card", "aria-label": `Kilómetros por ${per}` },
       h("div", { class: "card-head" }, h("h2", {}, `Kilómetros por ${per}`)),
@@ -1507,8 +1525,8 @@ window.addEventListener("resize", () => {
 const STRAVA_ERRORS = {
   strava_denied: "Cancelaste la conexión con Strava.",
   strava_scope: "Para importar tus carreras, Strava necesita permiso para leer tus actividades.",
-  strava_state: "El enlace de Strava caducó. Inténtalo de nuevo.",
-  strava_token: "Strava no respondió. Inténtalo de nuevo.",
+  strava_state: "El enlace de Strava venció. Probá de nuevo.",
+  strava_token: "Strava no respondió. Probá de nuevo.",
   strava_save: "No se pudo guardar la conexión con Strava.",
 };
 
@@ -1527,7 +1545,7 @@ function renderLogin(message = "") {
     field("Usuario", user), field("Contraseña", pass), submit, status);
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (!user.value.trim() || !pass.value) { status.textContent = "Escribe tu usuario y tu contraseña."; return; }
+    if (!user.value.trim() || !pass.value) { status.textContent = "Escribí tu usuario y tu contraseña."; return; }
     submit.disabled = true;
     submit.textContent = "Entrando…";
     status.textContent = "";
@@ -1564,7 +1582,7 @@ async function startApp() {
   } catch (err) {
     console.error(err);
     account.user = null;
-    if (err instanceof SessionExpired) renderLogin("Tu sesión caducó. Vuelve a entrar.");
+    if (err instanceof SessionExpired) renderLogin("Tu sesión venció. Volvé a entrar.");
     else renderMessage("No se pudieron cargar tus datos", err.message);
     return false;
   }
@@ -1599,8 +1617,8 @@ function takeUrlParams() {
 }
 
 onWriteError((err) => {
-  if (err instanceof SessionExpired) { renderLogin("Tu sesión caducó. Vuelve a entrar."); return; }
-  toast("No se pudo guardar el último cambio. Revisa tu conexión.");
+  if (err instanceof SessionExpired) { renderLogin("Tu sesión venció. Volvé a entrar."); return; }
+  toast("No se pudo guardar el último cambio. Revisá tu conexión.");
   if (account.user) loadAll().then(render).catch(() => {});
 });
 

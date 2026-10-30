@@ -8,7 +8,7 @@ export default async (req) => {
   if (!sameOrigin(req)) return json({ error: "Origen no permitido" }, 403);
   try {
     const profile = sessionProfile(req);
-    if (!profile) return json({ error: "Inicia sesión de nuevo" }, 401);
+    if (!profile) return json({ error: "Iniciá sesión de nuevo" }, 401);
     const u = new URL("https://www.strava.com/oauth/authorize");
     u.search = new URLSearchParams({
       client_id: env("STRAVA_CLIENT_ID"),

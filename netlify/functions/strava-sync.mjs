@@ -17,7 +17,7 @@ export default async (req) => {
 
   try {
     const profile = sessionProfile(req);
-    if (!profile) return json({ error: "Inicia sesión de nuevo" }, 401);
+    if (!profile) return json({ error: "Iniciá sesión de nuevo" }, 401);
     const db = supabaseAdmin();
     const body = await req.json().catch(() => ({}));
 
@@ -28,7 +28,7 @@ export default async (req) => {
     }
 
     const token = await stravaAccessToken(profile);
-    if (!token) return json({ error: "Conecta Strava primero" }, 409);
+    if (!token) return json({ error: "Primero conectá Strava" }, 409);
 
     // desde la última carrera importada (con 1 día de margen), o todo el historial
     const { data: last } = await db.from("runs").select("date")
@@ -40,8 +40,8 @@ export default async (req) => {
       const res = await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=100&page=${page}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.status === 429) return json({ error: "Strava limita las peticiones. Prueba en 15 minutos." }, 429);
-      if (!res.ok) return json({ error: "Strava no respondió. Inténtalo más tarde." }, 502);
+      if (res.status === 429) return json({ error: "Strava limita los pedidos. Probá en 15 minutos." }, 429);
+      if (!res.ok) return json({ error: "Strava no respondió. Probá más tarde." }, 502);
       const list = await res.json();
       for (const a of list) {
         if (!RUN_TYPES.has(a.sport_type || a.type)) continue;

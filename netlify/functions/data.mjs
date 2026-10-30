@@ -31,7 +31,7 @@ export default async (req) => {
 
   try {
     const profile = sessionProfile(req);
-    if (!profile) return json({ error: "Inicia sesión de nuevo" }, 401);
+    if (!profile) return json({ error: "Iniciá sesión de nuevo" }, 401);
     const db = supabaseAdmin();
     const body = await req.json().catch(() => ({}));
     const must = ({ data, error }) => { if (error) throw error; return data; };
@@ -101,7 +101,7 @@ export default async (req) => {
       return json({ error: `Falta configurar la app en Netlify: ${err.variable}.` }, 503);
     }
     console.error(err);
-    return json({ error: explainDbError(err) || "No se pudo guardar. Inténtalo de nuevo." }, 500);
+    return json({ error: explainDbError(err) || "No se pudo guardar. Probá de nuevo." }, 500);
   }
 };
 

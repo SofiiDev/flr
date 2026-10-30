@@ -13,7 +13,7 @@ Desglosa el texto del usuario en alimentos o ingredientes y estima para cada uno
 - Usa valores de referencia habituales (USDA, BEDCA) para el alimento tal como se describe: crudo o cocinado, con o sin piel, etc.
 - Si falta la cantidad, asume una ración estándar y escríbela en "quantity" (por ejemplo "1 unidad (~120 g)").
 - Interpreta medidas caseras de España y Latinoamérica (cda, cdta, taza, puñado, rebanada).
-- "name" en español y breve. "notes": una o dos frases con las suposiciones importantes, o cadena vacía.
+- "name" en español rioplatense (Argentina y Uruguay: palta, banana, frutilla, morrón, choclo, zapallo, durazno) y breve. "notes": una o dos frases con las suposiciones importantes, o cadena vacía.
 - Si el texto no describe alimentos, devuelve items vacío y explícalo en "notes".`;
 
 const SCHEMA = {
@@ -56,7 +56,7 @@ export default async (req) => {
 
   // solo con sesión: la IA cuesta dinero
   try {
-    if (!sessionProfile(req)) return json({ error: "Inicia sesión para usar la IA" }, 401);
+    if (!sessionProfile(req)) return json({ error: "Iniciá sesión para usar la IA" }, 401);
   } catch (err) {
     if (err instanceof ConfigError) return json({ error: "Falta configurar la app en Netlify (STATE_SECRET)" }, 503);
     throw err;
@@ -69,12 +69,12 @@ export default async (req) => {
     return json({ error: "Petición no válida" }, 400);
   }
   const text = typeof body?.text === "string" ? body.text.trim() : "";
-  if (!text) return json({ error: "Describe los alimentos o ingredientes" }, 400);
+  if (!text) return json({ error: "Describí los alimentos o ingredientes" }, 400);
   if (text.length > MAX_CHARS) return json({ error: `El texto es demasiado largo (máx. ${MAX_CHARS} caracteres)` }, 400);
   const servings = Number.isFinite(body?.servings) && body.servings > 1 ? Math.min(100, body.servings) : 0;
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return json({ error: "La IA no está configurada en el servidor. Introduce los macros a mano." }, 503);
+    return json({ error: "La IA no está configurada en el servidor. Cargá los macros a mano." }, 503);
   }
   const client = new Anthropic();
 
@@ -98,17 +98,17 @@ export default async (req) => {
     });
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) {
-      return json({ error: "Demasiadas peticiones a la IA. Prueba de nuevo en un minuto." }, 429);
+      return json({ error: "Demasiados pedidos a la IA. Probá de nuevo en un minuto." }, 429);
     }
     if (err instanceof Anthropic.APIError) {
       console.error("Anthropic API error", err.status, err.message);
-      return json({ error: "La IA no está disponible ahora mismo. Inténtalo más tarde." }, 502);
+      return json({ error: "La IA no está disponible en este momento. Probá más tarde." }, 502);
     }
     throw err;
   }
 
   if (res.stop_reason === "refusal") {
-    return json({ error: "La IA no pudo procesar ese texto. Prueba a describirlo de otra forma." }, 422);
+    return json({ error: "La IA no pudo procesar ese texto. Probá describirlo de otra forma." }, 422);
   }
 
   const out = res.content.find((b) => b.type === "text");
@@ -116,7 +116,7 @@ export default async (req) => {
   try {
     data = JSON.parse(out?.text ?? "");
   } catch {
-    return json({ error: "La IA devolvió una respuesta incompleta. Inténtalo de nuevo." }, 502);
+    return json({ error: "La IA devolvió una respuesta incompleta. Probá de nuevo." }, 502);
   }
 
   const items = (Array.isArray(data.items) ? data.items : []).slice(0, 60).map((i) => ({
