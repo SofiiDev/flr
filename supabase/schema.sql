@@ -125,6 +125,28 @@ create table if not exists public.body_metrics (
 );
 create index if not exists body_metrics_profile_date on public.body_metrics (profile_id, date desc);
 
+-- ---------- Plan semanal: qué receta se come cada día ----------
+create table if not exists public.meal_plan (
+  id         uuid primary key default gen_random_uuid(),
+  profile_id text not null references public.profiles (id) on delete cascade,
+  date       date not null,
+  slot       text not null default 'comida',
+  recipe_id  uuid not null references public.recipes (id) on delete cascade,
+  servings   numeric(5,2) not null default 1 check (servings > 0),
+  created_at timestamptz not null default now()
+);
+create index if not exists meal_plan_profile_date on public.meal_plan (profile_id, date);
+
+-- ---------- Lista de compras de cada semana (la arma la IA) ----------
+create table if not exists public.shopping_lists (
+  id         uuid primary key default gen_random_uuid(),
+  profile_id text not null references public.profiles (id) on delete cascade,
+  week_start date not null,
+  sections   jsonb not null default '[]',   -- [{ name, items: [{ name, quantity, note, checked }] }]
+  updated_at timestamptz not null default now(),
+  unique (profile_id, week_start)
+);
+
 -- ---------- Tokens de Strava ----------
 create table if not exists public.strava_tokens (
   profile_id    text primary key references public.profiles (id) on delete cascade,
@@ -142,10 +164,12 @@ alter table public.recipes       enable row level security;
 alter table public.meals         enable row level security;
 alter table public.sleep         enable row level security;
 alter table public.body_metrics  enable row level security;
+alter table public.meal_plan     enable row level security;
+alter table public.shopping_lists enable row level security;
 alter table public.strava_tokens enable row level security;
 
-revoke all on public.profiles, public.runs, public.recipes, public.meals,
-  public.sleep, public.body_metrics, public.strava_tokens from anon, authenticated;
+revoke all on public.profiles, public.runs, public.recipes, public.meals, public.sleep,
+  public.body_metrics, public.meal_plan, public.shopping_lists, public.strava_tokens from anon, authenticated;
 
 -- que la API de Supabase vea las tablas nuevas sin esperar
 notify pgrst, 'reload schema';

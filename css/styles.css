@@ -656,3 +656,31 @@ body.signed-out { padding-bottom: 0; }
 .tour-tip p { color: var(--text-2); line-height: 1.5; }
 .tour-actions { display: flex; gap: var(--s3); margin-top: var(--s4); }
 .tour-actions .btn { flex: 1; }
+
+/* ---------- plan semanal y lista de compras ---------- */
+.plan-day.is-today { border-color: var(--accent); }
+.plan-day .card-head { margin-bottom: var(--s2); }
+.plan-add { display: inline-block; margin-top: var(--s1); font-size: var(--fs-sm); }
+.plan-log { min-height: 36px; padding: 0 var(--s3); font-size: var(--fs-sm); flex: none; }
+.done-chip { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); font-weight: 600; flex: none; }
+
+.picks { margin-bottom: var(--s4); }
+.pick { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) 0; border-top: 1px solid var(--line); }
+.pick:first-child { border-top: 0; }
+.pick-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s3); cursor: pointer; }
+.pick-main strong { font-size: .9375rem; }
+.pick-serv { width: 76px; flex: none; display: flex; flex-direction: column; gap: 2px; }
+.pick-serv span { font-size: 11px; font-weight: 600; color: var(--text-3); }
+.pick-serv input { min-height: 40px; padding: 6px 8px; text-align: right; }
+input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; flex: none; accent-color: var(--accent); margin: 0; }
+
+.shop > .muted { margin-bottom: 2px; }
+.shop-section { margin-top: var(--s5); }
+.shop-section h3 { font-size: var(--fs-xs); font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin-bottom: var(--s1); }
+.shop-item { padding: 0; border-top: 1px solid var(--line); }
+.shop-item:first-child { border-top: 0; }
+.shop-item label { display: flex; align-items: center; gap: var(--s3); min-height: var(--tap); padding: var(--s2) 0; cursor: pointer; }
+.shop-name { font-weight: 550; }
+.shop-qty { margin-left: var(--s2); color: var(--text-2); font-size: var(--fs-sm); }
+.shop-item.done .shop-name, .shop-item.done .shop-qty { text-decoration: line-through; color: var(--text-3); }
+.shop .actions { margin-top: var(--s5); }

@@ -18,6 +18,8 @@ const ICON = {
   summary: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  cart: '<path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>',
+  share: '<path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   left: '<path d="m15 18-6-6 6-6"/>',
@@ -623,6 +625,14 @@ const GUIDE = [
     "Tocá «Calcular macros con IA» y después «Guardar». La app muestra las calorías y los macros por porción.",
     "Para comer una porción, abrí la receta y tocá «Registrar una porción hoy».",
   ], "Las recetas son compartidas: las que guarda una, la otra también las ve."],
+  ["Planificar la semana y hacer las compras", [
+    "En Comidas, tocá la pestaña «Semana». Con las flechas pasás a la semana siguiente o a la anterior.",
+    "En cada día tocá «+ Agregar», elegí el momento, la receta y las porciones, y tocá «Agregar».",
+    "Cuando tengas la semana armada, tocá «Armar lista de compras». Las recetas de la semana ya vienen marcadas: podés sumar otras o cambiar las porciones.",
+    "Tocá «Armar lista con IA»: suma los ingredientes de todas las recetas y los ordena por sección del súper.",
+    "En el súper, tocá cada producto para tacharlo. Con «Compartir» la mandás por WhatsApp.",
+    "El día que la comés, en el Diario aparece en «Planificado»: tocá «Registrar» y se carga con sus macros.",
+  ], "Para cambiar o quitar una comida planificada, tocala en la semana."],
   ["Peso, IMC y grasa", [
     "Andá a Cuerpo y tocá «+ Peso».",
     "Escribí tu peso y, si tu balanza la mide, tu grasa corporal (%). La primera vez te pide tu altura para calcular el IMC.",
@@ -662,7 +672,7 @@ const TOUR = [
   { view: "today", target: ".quick", title: "Registrar rápido", text: "Desde acá anotás una carrera, una comida, tu peso o tu sueño en dos toques." },
   { view: "runs", target: ".fab", title: "Correr", text: "Tocá «+ Carrera» para cargar una a mano: el ritmo por km se calcula solo. Las de tu Garmin llegan solas vía Strava." },
   { view: "meals", target: ".fab", title: "Comidas", text: "Tocá «+ Comida», describí lo que comiste y tocá «Calcular macros con IA». También podés elegir una receta o escribir los macros. Para corregir una comida o cambiarla de momento, tocala." },
-  { view: "meals", target: ".subnav", title: "Recetas compartidas", text: "En «Recetas» guardás tus platos con sus ingredientes; la IA calcula los macros por porción. Las ven las dos." },
+  { view: "meals", target: ".subnav", title: "Semana y recetas", text: "En «Semana» repartís tus recetas en los días y armás la lista de compras con IA. En «Recetas» guardás tus platos con sus ingredientes; las ven las dos." },
   { view: "body", target: ".fab", title: "Peso, IMC y grasa", text: "Tocá «+ Peso» para anotar tu peso y, si la tenés, tu grasa corporal. El IMC se calcula con tu altura." },
   { view: "body", target: ".subnav", title: "Sueño", text: "En esta misma pantalla, la pestaña «Sueño» guarda a qué hora te acostaste, a qué hora te levantaste y cómo dormiste." },
   { view: "summary", target: ".period", title: "Resumen", text: "Elegí el período y vas a ver tus totales, gráficos frente a tus objetivos, récords y una tabla mes a mes." },
@@ -901,6 +911,161 @@ async function syncStrava({ button, silent } = {}) {
   }
 }
 
+/* ============ plan semanal y lista de compras ============ */
+
+// hora por defecto al pasar una comida planificada al diario
+const SLOT_TIME = { desayuno: "08:00", comida: "13:00", merienda: "17:00", cena: "21:00", snack: "11:00" };
+const slotLabel = (k) => SLOTS.find(([v]) => v === k)?.[1] || "Comida";
+const slotOrder = (k) => SLOTS.findIndex(([v]) => v === k);
+const recipeById = (rid) => db.recipes.find((r) => r.id === rid);
+const weekDays = (ws) => Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+const shoppingFor = (ws) => db.shopping.find((l) => l.weekStart === ws);
+const planKcal = (x) => { const r = recipeById(x.recipeId); return r ? (r.kcal / r.servings) * x.servings : 0; };
+const fmtServ = (n) => `${fmt1(n)} ${n === 1 ? "porción" : "porciones"}`;
+const weekLabel = (ws) => `${shortDate(ws)} – ${shortDate(addDays(ws, 6))}`;
+const isLogged = (x) => db.meals.some((m) => m.date === x.date && m.slot === x.slot && m.recipeId === x.recipeId);
+
+/** Pasa una comida planificada al diario de ese día, con sus macros escalados. */
+function logPlanned(x) {
+  const r = recipeById(x.recipeId);
+  if (!r) return;
+  const k = x.servings / r.servings;
+  upsert("meals", {
+    date: x.date, time: SLOT_TIME[x.slot] || "12:00", slot: x.slot, name: r.name,
+    kcal: r.kcal * k, p: r.p * k, c: r.c * k, f: r.f * k, recipeId: r.id, servings: x.servings,
+  });
+  toast(`Registrada en el diario: ${r.name}`);
+}
+
+function planForm(entry, preset = {}) {
+  const recipes = [...db.recipes].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  if (!recipes.length) { toast("Primero guardá una receta"); go("recipes"); return; }
+  const e = entry || { date: preset.date || todayISO(), slot: preset.slot || "comida", recipeId: recipes[0].id, servings: 1 };
+  const date = h("input", { type: "date", name: "date", value: e.date, required: true });
+  const recipeSel = h("select", { name: "recipe" },
+    recipes.map((r) => h("option", { value: r.id, selected: r.id === e.recipeId }, r.name)));
+  const servings = numInput("servings", e.servings, { placeholder: "1" });
+  const kcal = h("b", { class: "num" });
+  const update = () => {
+    const r = recipeById(recipeSel.value);
+    kcal.textContent = r ? `${fmt0((r.kcal / r.servings) * (readNum(servings) || 1))} kcal` : "—";
+  };
+  recipeSel.addEventListener("change", update);
+  servings.addEventListener("input", update);
+  update();
+  const current = (f) => ({ id: e.id || uid(), date: date.value || e.date, slot: checked(f, "slot"), recipeId: recipeSel.value, servings: readNum(servings) || 1 });
+
+  const form = sheetForm((f) => {
+    upsert("plan", current(f));
+    closeSheet(); toast(entry ? "Plan actualizado" : "Agregado a la semana"); render();
+  },
+    field("Día", date),
+    h("div", { class: "field" }, h("span", { class: "label" }, "Momento"), segmented("slot", SLOTS, e.slot, "Momento del día")),
+    field("Receta", recipeSel),
+    field("Porciones", servings),
+    h("div", { class: "live", "aria-live": "polite" }, h("span", {}, "Aporta "), kcal),
+    entry && h("button", {
+      type: "button", class: "btn ghost block", style: "margin-bottom:12px",
+      onclick: (ev) => { const x = current(ev.currentTarget.form); upsert("plan", x); logPlanned(x); closeSheet(); render(); },
+    }, isLogged(e) ? "Volver a registrar en el diario" : "Registrar en el diario"),
+    formActions(entry && (() => { remove("plan", e.id); closeSheet(); toast("Quitado de la semana"); render(); }), entry ? "Guardar" : "Agregar"),
+  );
+  openSheet(entry ? "Editar comida planificada" : "Planificar comida", form);
+}
+
+/** Paso 1 de la lista: elegir recetas (las del plan vienen marcadas) y porciones. */
+function shoppingSelectSheet(ws) {
+  const days = weekDays(ws);
+  const planned = new Map();
+  db.plan.filter((x) => x.date >= days[0] && x.date <= days[6] && recipeById(x.recipeId))
+    .forEach((x) => planned.set(x.recipeId, (planned.get(x.recipeId) || 0) + x.servings));
+  const recipes = [...db.recipes].sort((a, b) => (planned.has(b.id) - planned.has(a.id)) || a.name.localeCompare(b.name, "es"));
+  if (!recipes.length) { toast("Primero guardá una receta"); go("recipes"); return; }
+
+  const rows = recipes.map((r) => {
+    const box = h("input", { type: "checkbox", checked: planned.has(r.id), "aria-label": `Incluir ${r.name}` });
+    const serv = numInput(`serv-${r.id}`, round1(planned.get(r.id) || r.servings), { label: `Porciones de ${r.name}` });
+    serv.addEventListener("input", () => { if (readNum(serv) > 0) box.checked = true; });
+    return { r, box, serv, el: h("li", { class: "pick" },
+      h("label", { class: "pick-main" }, box,
+        h("span", {}, h("strong", {}, r.name),
+          h("span", { class: "hint", style: "display:block" }, planned.has(r.id) ? `${fmtServ(planned.get(r.id))} en tu semana` : "No está en el plan"))),
+      h("label", { class: "pick-serv" }, h("span", {}, "Porc."), serv)) };
+  });
+  const status = h("p", { class: "error", role: "alert" });
+  const go_ = h("button", { type: "button", class: "btn primary block", icon: "spark" }, "Armar lista con IA");
+  go_.addEventListener("click", async () => {
+    const chosen = rows.filter((x) => x.box.checked && readNum(x.serv) > 0);
+    if (!chosen.length) { status.textContent = "Elegí al menos una receta."; return; }
+    go_.disabled = true; go_.lastChild.textContent = "Armando la lista…"; status.textContent = "";
+    try {
+      const data = await api("/api/shopping", {
+        recipes: chosen.map(({ r, serv }) => ({ name: r.name, ingredients: r.ingredients, servings: r.servings, planned: readNum(serv) })),
+      });
+      upsert("shopping", { id: shoppingFor(ws)?.id || uid(), weekStart: ws, sections: data.sections });
+      shoppingSheet(ws, data.notes);
+      render();
+    } catch (err) {
+      status.textContent = err.message;
+    } finally {
+      go_.disabled = false; go_.lastChild.textContent = "Armar lista con IA";
+    }
+  });
+  openSheet("Elegí tus recetas", h("div", {},
+    h("p", { class: "muted", style: "margin-bottom:12px" }, `Semana del ${weekLabel(ws)}. Marcá las recetas que vas a cocinar y ajustá las porciones: la IA suma los ingredientes y arma la lista por sección del súper.`),
+    h("ul", { class: "list picks" }, rows.map((x) => x.el)),
+    go_, status));
+}
+
+function shoppingText(ws, list) {
+  const lines = [`Lista de compras · ${weekLabel(ws)}`];
+  for (const sec of list.sections) {
+    const left = sec.items.filter((i) => !i.checked);
+    if (!left.length) continue;
+    lines.push("", sec.name.toUpperCase());
+    left.forEach((i) => lines.push(`• ${i.name}${i.quantity ? `: ${i.quantity}` : ""}${i.note ? ` (${i.note})` : ""}`));
+  }
+  return lines.join("\n");
+}
+
+/** Paso 2: la lista por secciones, para ir tachando en el súper. */
+function shoppingSheet(ws, notes) {
+  const list = shoppingFor(ws);
+  if (!list) { shoppingSelectSheet(ws); return; }
+  const progress = h("p", { class: "muted num" });
+  const paint = () => {
+    const all = list.sections.flatMap((s) => s.items);
+    progress.textContent = `${all.filter((i) => i.checked).length} de ${all.length} en el changuito`;
+  };
+  const share = async () => {
+    const text = shoppingText(ws, list);
+    if (navigator.share) {
+      try { await navigator.share({ title: "Lista de compras", text }); return; } catch (err) { if (err?.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(text); toast("Lista copiada: pegala en WhatsApp o en tus notas"); }
+    catch { toast("No se pudo copiar la lista en este celular"); }
+  };
+  openSheet("Lista de compras", h("div", { class: "shop" },
+    h("p", { class: "muted" }, `Semana del ${weekLabel(ws)}`), progress,
+    notes && h("p", { class: "ai-note" }, notes),
+    list.sections.map((sec) => h("section", { class: "shop-section" },
+      h("h3", {}, sec.name),
+      h("ul", { class: "list" }, sec.items.map((it) => {
+        const box = h("input", { type: "checkbox", checked: it.checked });
+        const row = h("li", { class: `shop-item${it.checked ? " done" : ""}` },
+          h("label", {}, box,
+            h("span", {}, h("span", { class: "shop-name" }, it.name), it.quantity && h("span", { class: "shop-qty num" }, it.quantity),
+              it.note && h("span", { class: "hint", style: "display:block" }, it.note))));
+        box.addEventListener("change", () => { it.checked = box.checked; row.classList.toggle("done", it.checked); paint(); upsert("shopping", list); render(); });
+        return row;
+      })))),
+    h("div", { class: "actions" },
+      h("button", { type: "button", class: "btn primary", icon: "share", onclick: share }, navigator.share ? "Compartir" : "Copiar"),
+      h("button", { type: "button", class: "btn ghost", onclick: () => shoppingSelectSheet(ws) }, "Volver a armar")),
+    confirmButton("Borrar lista", "¿Seguro? Tocá de nuevo", () => { remove("shopping", list.id); closeSheet(); toast("Lista borrada"); render(); }, "btn danger block wipe")));
+  paint();
+}
+
 /* ============ componentes de vista ============ */
 
 function ring(value, goal, big, small, { color = "", size = "" } = {}) {
@@ -1023,7 +1188,7 @@ function subnav(items, current, label) {
       onclick: () => go(view),
     }, text)));
 }
-const mealsNav = (v) => subnav([["meals", "Diario"], ["recipes", "Recetas"]], v, "Comidas");
+const mealsNav = (v) => subnav([["meals", "Diario"], ["plan", "Semana"], ["recipes", "Recetas"]], v, "Comidas");
 const bodyNav = (v) => subnav([["body", "Peso y grasa"], ["sleep", "Sueño"]], v, "Cuerpo");
 
 // ancho interior de una tarjeta, para dibujar los gráficos a su tamaño
@@ -1042,12 +1207,13 @@ function sleepItem(s) {
 
 /* ============ vistas ============ */
 
-const state = { view: "today", mealDate: todayISO(), period: "3m" };
+const state = { view: "today", mealDate: todayISO(), planWeek: weekStart(todayISO()), period: "3m" };
 
 const VIEWS = {
   today: { title: "Hoy", tab: "today", render: viewToday },
   runs: { title: "Correr", tab: "runs", render: viewRuns },
   meals: { title: "Comidas", tab: "meals", render: viewMeals },
+  plan: { title: "Semana", tab: "meals", render: viewPlan },
   recipes: { title: "Recetas", tab: "meals", render: viewRecipes },
   body: { title: "Cuerpo", tab: "body", render: viewBody },
   sleep: { title: "Sueño", tab: "body", render: viewSleep },
@@ -1159,12 +1325,78 @@ function viewMeals() {
       h("strong", {}, capitalize(dayLabel(d))),
       h("button", { type: "button", class: "icon-btn", icon: "right", "aria-label": "Día siguiente", disabled: isToday, onclick: () => { state.mealDate = addDays(d, 1); render(); } })),
     nutritionCard(meals, "Total del día"),
+    plannedCard(d),
     groups.length
       ? groups.map(([label, list]) => h("section", { class: "card", "aria-label": label },
           h("div", { class: "card-head" }, h("h2", {}, label), h("span", { class: "muted num" }, `${fmt0(sum(list, "kcal"))} kcal`)),
           h("ul", { class: "list" }, list.map(mealItem))))
       : h("section", { class: "card" }, emptyState("meals", "Nada registrado este día", "Tocá «Comida» para cargar lo que comiste.")),
     fab("Comida", () => mealForm(null, { date: d })),
+  ];
+}
+
+/** En el diario: lo planificado para ese día, con un toque para registrarlo. */
+function plannedCard(d) {
+  const entries = db.plan.filter((x) => x.date === d && recipeById(x.recipeId)).sort((a, b) => slotOrder(a.slot) - slotOrder(b.slot));
+  if (!entries.length) return null;
+  return h("section", { class: "card", "aria-label": "Planificado para este día" },
+    h("div", { class: "card-head" }, h("h2", {}, "Planificado"),
+      h("button", { type: "button", class: "link", onclick: () => { state.planWeek = weekStart(d); go("plan"); } }, "Ver semana")),
+    h("ul", { class: "list" }, entries.map((x) => {
+      const r = recipeById(x.recipeId);
+      return h("li", { class: "item" },
+        h("span", { class: "item-main" },
+          h("span", { class: "item-title", style: "display:block" }, r.name),
+          h("span", { class: "item-sub num" }, `${slotLabel(x.slot)} · ${fmtServ(x.servings)} · ${fmt0(planKcal(x))} kcal`)),
+        isLogged(x)
+          ? h("span", { class: "chip done-chip" }, "Registrada")
+          : h("button", { type: "button", class: "btn ai plan-log", onclick: () => { logPlanned(x); render(); } }, "Registrar"));
+    })));
+}
+
+function viewPlan() {
+  const ws = state.planWeek;
+  const days = weekDays(ws);
+  const entries = db.plan.filter((x) => x.date >= days[0] && x.date <= days[6] && recipeById(x.recipeId));
+  const list = shoppingFor(ws);
+  const items = list ? list.sections.flatMap((s) => s.items) : [];
+  const plannedDays = new Set(entries.map((x) => x.date)).size;
+  const t = todayISO();
+
+  return [
+    mealsNav("plan"),
+    h("div", { class: "datebar" },
+      h("button", { type: "button", class: "icon-btn", icon: "left", "aria-label": "Semana anterior", onclick: () => { state.planWeek = addDays(ws, -7); render(); } }),
+      h("strong", { class: "num" }, ws === weekStart(t) ? `Esta semana · ${weekLabel(ws)}` : weekLabel(ws)),
+      h("button", { type: "button", class: "icon-btn", icon: "right", "aria-label": "Semana siguiente", onclick: () => { state.planWeek = addDays(ws, 7); render(); } })),
+    !db.recipes.length && h("section", { class: "card" },
+      emptyState("recipes", "Primero guardá tus recetas", "Después las vas a poder repartir en los días de la semana."),
+      h("button", { type: "button", class: "btn primary block", onclick: () => go("recipes") }, "Ir a Recetas")),
+    db.recipes.length > 0 && h("section", { class: "card", "aria-label": "Resumen de la semana" },
+      h("div", { class: "stats" },
+        stat(String(entries.length), "", "Comidas planificadas", `${plannedDays} de 7 días`),
+        stat(plannedDays ? fmt0(sum(entries.map((x) => ({ k: planKcal(x) })), "k") / plannedDays) : "—", "kcal", "Por día planificado", `Objetivo ${fmt0(db.goals.kcal)}`)),
+      h("div", { class: "actions", style: "margin-top:16px" },
+        h("button", { type: "button", class: "btn primary", icon: "cart", onclick: () => shoppingSelectSheet(ws) }, list ? "Rehacer lista" : "Armar lista de compras"),
+        list && h("button", { type: "button", class: "btn ghost", onclick: () => shoppingSheet(ws) }, `Ver lista (${items.filter((i) => i.checked).length}/${items.length})`))),
+    db.recipes.length > 0 && days.map((d) => {
+      const dayEntries = entries.filter((x) => x.date === d).sort((a, b) => slotOrder(a.slot) - slotOrder(b.slot));
+      return h("section", { class: `card plan-day${d === t ? " is-today" : ""}`, "aria-label": dayLabel(d) },
+        h("div", { class: "card-head" },
+          h("h2", {}, capitalize(parseDate(d).toLocaleDateString("es", { weekday: "long", day: "numeric" }))),
+          h("span", { class: "muted num" }, dayEntries.length ? `${fmt0(sum(dayEntries.map((x) => ({ k: planKcal(x) })), "k"))} kcal` : d === t ? "Hoy" : "")),
+        dayEntries.length > 0 && h("ul", { class: "list" }, dayEntries.map((x) => {
+          const r = recipeById(x.recipeId);
+          return h("li", { class: "item" },
+            h("button", { type: "button", class: "item-btn", onclick: () => planForm(x) },
+              h("span", { class: "badge", icon: "meals" }),
+              h("span", { class: "item-main" },
+                h("span", { class: "item-title", style: "display:block" }, r.name),
+                h("span", { class: "item-sub" }, `${slotLabel(x.slot)} · ${fmtServ(x.servings)}`, isLogged(x) ? " · registrada" : "")),
+              h("span", { class: "item-end num" }, fmt0(planKcal(x)), h("small", {}, "kcal"))));
+        })),
+        h("button", { type: "button", class: "link plan-add", onclick: () => planForm(null, { date: d }) }, "+ Agregar"));
+    }),
   ];
 }
 

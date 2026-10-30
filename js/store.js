@@ -92,6 +92,19 @@ const clean = {
     fat: b.fat == null || b.fat === "" || !num(b.fat) ? null : num(b.fat, 2, 75),
     notes: str(b.notes, 500),
   },
+  plan: (x) => isDate(x?.date) && typeof x.recipeId === "string" && x.recipeId && {
+    id: id(x.id), date: x.date, slot: str(x.slot, 20) || "comida",
+    recipeId: str(x.recipeId, 40), servings: num(x.servings, 0.25, 100) || 1,
+  },
+  shopping: (x) => isDate(x?.weekStart) && {
+    id: id(x.id), weekStart: x.weekStart,
+    sections: (Array.isArray(x.sections) ? x.sections : []).slice(0, 12).map((sec) => ({
+      name: str(sec?.name, 40) || "Otros",
+      items: (Array.isArray(sec?.items) ? sec.items : []).slice(0, 80).map((it) => ({
+        name: str(it?.name, 80), quantity: str(it?.quantity, 40), note: str(it?.note, 80), checked: it?.checked === true,
+      })).filter((it) => it.name),
+    })).filter((sec) => sec.items.length),
+  },
   sleep: (s) => isDate(s?.date) && {
     id: id(s.id), date: s.date,
     bed: hhmm(s.bed, "23:00"), wake: hhmm(s.wake, "07:00"),
@@ -125,6 +138,8 @@ const fromRow = {
   recipes: (r) => r,
   sleep: (s) => s,
   body: (b) => ({ ...b, weight: b.weight_kg, fat: b.body_fat_pct }),
+  plan: (x) => ({ ...x, recipeId: x.recipe_id }),
+  shopping: (x) => ({ ...x, weekStart: x.week_start }),
 };
 
 const toRow = {
@@ -140,13 +155,15 @@ const toRow = {
   }),
   sleep: (s) => ({ id: s.id, date: s.date, bed: s.bed, wake: s.wake, hours: s.hours, quality: s.quality, notes: s.notes }),
   body: (b) => ({ id: b.id, date: b.date, weight_kg: b.weight, body_fat_pct: b.fat, notes: b.notes }),
+  plan: (x) => ({ id: x.id, date: x.date, slot: x.slot, recipe_id: x.recipeId, servings: x.servings }),
+  shopping: (x) => ({ id: x.id, week_start: x.weekStart, sections: x.sections, updated_at: new Date().toISOString() }),
 };
 
-const COLLECTIONS = ["runs", "meals", "recipes", "sleep", "body"];
+const COLLECTIONS = ["runs", "meals", "recipes", "sleep", "body", "plan", "shopping"];
 // nombre de la tabla en Supabase de cada colección
-const TABLE = { runs: "runs", meals: "meals", recipes: "recipes", sleep: "sleep", body: "body_metrics" };
+const TABLE = { runs: "runs", meals: "meals", recipes: "recipes", sleep: "sleep", body: "body_metrics", plan: "meal_plan", shopping: "shopping_lists" };
 
-export const db = { runs: [], meals: [], recipes: [], sleep: [], body: [], goals: { ...DEFAULT_GOALS } };
+export const db = { runs: [], meals: [], recipes: [], sleep: [], body: [], plan: [], shopping: [], goals: { ...DEFAULT_GOALS } };
 export const account = { user: null, profile: null, loadedAt: 0 };
 
 /* ---------- carga ---------- */
@@ -232,10 +249,11 @@ export async function importJSON(text) {
     const rec = clean[c]({ ...x, id: undefined });
     if (rec && c === "recipes") recipeIds.set(x.id, rec.id);
     if (rec && c === "meals") rec.recipeId = recipeIds.get(x.recipeId) || "";
-    return rec;
+    if (rec && c === "plan") rec.recipeId = recipeIds.get(x.recipeId) || "";   // sin su receta, se descarta
+    return c === "plan" && !rec?.recipeId ? null : rec;
   }).filter(Boolean);
 
-  for (const c of ["recipes", "runs", "meals", "sleep", "body"]) {
+  for (const c of ["recipes", "runs", "meals", "sleep", "body", "plan"]) {
     const list = fresh(c, raw[c]);
     for (let i = 0; i < list.length; i += 500) {
       await call("insert", { table: TABLE[c], rows: list.slice(i, i + 500).map(toRow[c]) });

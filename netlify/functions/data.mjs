@@ -1,11 +1,11 @@
 /* FlorLovesRunning — acceso a los datos del perfil con sesión
    POST /api/data (Bearer) { action, ... }
-     load                         → { profile, runs, meals, sleep, body_metrics, recipes }
+     load                         → { profile, runs, meals, sleep, body_metrics, meal_plan, shopping_lists, recipes }
      upsert  { table, row }       → guarda un registro del perfil (o una receta compartida)
      delete  { table, id }        → borra un registro del perfil (o una receta)
      insert  { table, rows }      → importación masiva (ids nuevos generados por el cliente)
      profile { patch }            → actualiza goals, height_cm o prefs
-     wipe                         → borra carreras, comidas, sueño y mediciones del perfil
+     wipe                         → borra todos los registros del perfil (no las recetas)
    El perfil sale siempre del token de sesión, nunca del cuerpo de la petición. */
 
 import { json, sameOrigin, sessionProfile, supabaseAdmin, explainDbError, ConfigError } from "../lib/server.mjs";
@@ -17,8 +17,11 @@ const COLUMNS = {
   sleep: ["id", "date", "bed", "wake", "hours", "quality", "notes"],
   body_metrics: ["id", "date", "weight_kg", "body_fat_pct", "notes"],
   recipes: ["id", "name", "servings", "ingredients", "kcal", "p", "c", "f", "items", "updated_at"],
+  meal_plan: ["id", "date", "slot", "recipe_id", "servings"],
+  shopping_lists: ["id", "week_start", "sections", "updated_at"],
 };
-const OWNED = ["runs", "meals", "sleep", "body_metrics"];   // con profile_id; las recetas son compartidas
+// con profile_id; las recetas son compartidas
+const OWNED = ["runs", "meals", "sleep", "body_metrics", "meal_plan", "shopping_lists"];
 const PROFILE_FIELDS = ["goals", "height_cm", "prefs"];
 
 const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => obj?.[k] !== undefined).map((k) => [k, obj[k]]));

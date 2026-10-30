@@ -9,11 +9,12 @@ App móvil privada (PWA instalable) para **Sofi y Flor**: carreras, comidas, rec
 - **Correr**: km, tiempo y tipo. Ritmo por km, km semanales frente al objetivo, ritmo medio del mes y gráfico de 7 días. Las carreras de Strava llegan solas, con desnivel y pulso medio.
 - **Comidas**: macros a mano, desde una receta o estimados por IA a partir de una descripción («2 huevos y una tostada con aguacate»).
 - **Recetas**: ingredientes con cantidades; la IA calcula los macros totales y por porción. **Las recetas son compartidas** entre Sofi y Flor.
+- **Semana**: planificá qué receta comer cada día (momento y porciones), elegí recetas y armá la **lista de compras con IA**, que suma y escala los ingredientes y los ordena por sección del súper; se tacha en el súper y se comparte por WhatsApp. Lo planificado aparece en el diario de cada día para registrarlo con un toque.
 - **Cuerpo**: peso, grasa corporal (%) e **IMC** calculado con tu altura (categorías de la OMS), con gráficos de 90 días, cambio en 30 días y distancia al peso objetivo. Incluye la pestaña de **Sueño**: horas, calidad, media de 7 días y déficit.
 - **Resumen**: todo consolidado por periodo (4 semanas, 3 meses, 12 meses o todo): totales y medias, gráficos frente a tus objetivos, **récords** y una tabla **mes a mes**.
 - **Ajustes**: apariencia de cada perfil (color de acento y modo Sistema, Claro u Oscuro), objetivos, peso objetivo y altura, conexión con Strava, exportar/importar copia, borrar registros y salir.
 
-Pestañas: Hoy · Correr · Comidas (Diario / Recetas) · Cuerpo (Peso y grasa / Sueño) · Resumen.
+Pestañas: Hoy · Correr · Comidas (Diario / Semana / Recetas) · Cuerpo (Peso y grasa / Sueño) · Resumen.
 
 **Tour guiado**: la primera vez que cada perfil entra en un móvil, la app recorre las pantallas iluminando cada botón y explicando para qué sirve (11 pasos, con Atrás, Siguiente y Saltar). Se repite desde Ajustes → «Tour guiado», donde también está la «Guía escrita» con los pasos de cada tarea.
 
@@ -25,6 +26,7 @@ Pestañas: Hoy · Correr · Comidas (Diario / Recetas) · Cuerpo (Peso y grasa /
 | Usuario y contraseña | `netlify/functions/login.mjs` → `POST /api/login` |
 | Datos (leer y guardar) | `netlify/functions/data.mjs` → `POST /api/data` |
 | IA de macros (Claude) | `netlify/functions/macros.mjs` → `POST /api/macros` |
+| IA de lista de compras (Claude) | `netlify/functions/shopping.mjs` → `POST /api/shopping` |
 | Strava: conectar y sincronizar | `netlify/functions/strava-*.mjs` → `/api/strava/*` |
 | Base de datos | Supabase — esquema en `supabase/schema.sql` |
 
