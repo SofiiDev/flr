@@ -333,6 +333,35 @@ function runForm(rec, preset = {}) {
   const notes = h("textarea", { name: "notes", rows: 2, placeholder: "Sensaciones, ruta, zapatillas…" });
   notes.value = r.notes || "";
 
+  // ritmo (correr, caminar) o velocidad (bici): se puede cargar en lugar del tiempo, y se sincronizan
+  const paceMin = numInput("paceMin", "", { int: true, label: "Minutos por km" });
+  const paceSec = numInput("paceSec", "", { int: true, label: "Segundos por km" });
+  const speedIn = numInput("speedKmh", "", { label: "Kilómetros por hora" });
+  const paceField = h("div", { class: "field" }, h("span", { class: "label" }, "o ritmo (min : seg por km)"),
+    h("div", { class: "row pace-row" }, paceMin, paceSec));
+  const speedField = field("o velocidad media (km/h)", speedIn);
+  const setTime = (total) => {
+    total = Math.round(total);
+    hh.value = total >= 3600 ? String(Math.floor(total / 3600)) : "";
+    mm.value = String(Math.floor((total % 3600) / 60));
+    ss.value = String(total % 60);
+  };
+  const fillRate = () => {   // del tiempo al ritmo o la velocidad
+    const d = readNum(km), sec = readNum(hh) * 3600 + readNum(mm) * 60 + readNum(ss);
+    if (!(d && sec)) return;
+    const p = Math.round(sec / d);
+    paceMin.value = String(Math.floor(p / 60)); paceSec.value = String(p % 60);
+    speedIn.value = String(round1(d / (sec / 3600))).replace(".", ",");
+  };
+  const fromPace = () => { const d = readNum(km), p = readNum(paceMin) * 60 + readNum(paceSec); if (d && p) { setTime(p * d); update(); } };
+  const fromSpeed = () => { const d = readNum(km), v = readNum(speedIn); if (d && v) { setTime((d / v) * 3600); update(); } };
+  paceMin.addEventListener("input", fromPace); paceSec.addEventListener("input", fromPace);
+  speedIn.addEventListener("input", fromSpeed);
+  [hh, mm, ss].forEach((i) => i.addEventListener("input", fillRate));
+  km.addEventListener("input", () => {
+    // con la distancia nueva, recalcula el tiempo si había un ritmo o una velocidad cargados
+    if (sportNow() === "ride" ? readNum(speedIn) : readNum(paceMin) || readNum(paceSec)) (sportNow() === "ride" ? fromSpeed : fromPace)();
+  });
   const liveLabel = h("span", {}, "Ritmo medio ");
   const pace = h("b", { class: "num" }, "—");
   const speed = h("span", { class: "num" }, "");
@@ -346,6 +375,8 @@ function runForm(rec, preset = {}) {
     pace.textContent = sp === "ride" ? fmtSpeed(s, d) : fmtPace(s, d);
     speed.textContent = sp === "ride" ? (d && s ? fmtPace(s, d) : "") : d && s ? fmtSpeed(s, d) : "";
     typeField.hidden = sp !== "run";
+    paceField.hidden = sp === "ride";
+    speedField.hidden = sp !== "ride";
     notes.placeholder = sp === "ride" ? "Recorrido, bici, viento…" : sp === "walk" ? "Recorrido, con quién, terreno…" : "Sensaciones, ruta, zapatillas…";
   };
   [km, hh, mm, ss].forEach((i) => i.addEventListener("input", update));
@@ -365,6 +396,8 @@ function runForm(rec, preset = {}) {
     h("div", { class: "field" },
       h("span", { class: "label" }, "Tiempo (h : min : s)"),
       h("div", { class: "row" }, hh, mm, ss)),
+    paceField,
+    speedField,
     h("div", { class: "live", "aria-live": "polite" }, h("span", {}, liveLabel, pace), speed),
     typeField,
     field("Notas", notes),
@@ -372,6 +405,7 @@ function runForm(rec, preset = {}) {
   );
   form.addEventListener("change", update);
   update();
+  fillRate();
   openSheet(rec ? "Editar actividad" : "Nueva actividad", form);
 }
 
