@@ -743,3 +743,14 @@ input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; flex: none; a
 :root[data-mode="dark"] .badge.owner { --own: var(--own-d); }
 @media (prefers-color-scheme: dark) { :root:not([data-mode="light"]) .badge.owner { --own: var(--own-d); } }
 .check-line { display: flex; align-items: center; gap: var(--s3); margin: calc(-1 * var(--s2)) 0 var(--s4); font-size: var(--fs-sm); color: var(--text-2); cursor: pointer; }
+
+/* ---------- deslizar entre pestañas ---------- */
+main { touch-action: pan-y; }   /* el navegador maneja el scroll vertical; el horizontal lo usa la app */
+/* lo que se corre de costado durante la animación no debe ensanchar la página */
+main { overflow-x: clip; }
+@supports not (overflow: clip) { main { overflow-x: hidden; } }
+/* se animan los bloques, no el contenedor: el botón flotante (fixed) no debe moverse */
+main.slide-from-right > :not(.fab) { animation: slide-from-right .24s ease-out; }
+main.slide-from-left > :not(.fab) { animation: slide-from-left .24s ease-out; }
+@keyframes slide-from-right { from { transform: translateX(28px); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes slide-from-left { from { transform: translateX(-28px); opacity: .4; } to { transform: none; opacity: 1; } }

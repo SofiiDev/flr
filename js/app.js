@@ -647,7 +647,7 @@ const GUIDE = [
     "Para comer una porción, abrí la receta y tocá «Registrar una porción hoy».",
   ], "Las recetas son compartidas: las que guarda una, la otra también las ve."],
   ["Planificar la semana y hacer las compras", [
-    "En Comidas, tocá la pestaña «Semana». Con las flechas pasás a la semana siguiente o a la anterior.",
+    "En Comidas, tocá la pestaña «Semana» (o deslizá hacia la izquierda desde el Diario). Con las flechas pasás a la semana siguiente o a la anterior.",
     "En cada día tocá «+ Agregar», elegí el momento, la receta y las porciones, y tocá «Agregar».",
     "Cuando tengas la semana armada, tocá «Armar lista de compras». Las recetas de la semana ya vienen marcadas: podés sumar otras o cambiar las porciones.",
     "Tocá «Armar lista con IA»: suma los ingredientes de todas las recetas y los ordena por sección del súper.",
@@ -673,7 +673,7 @@ const GUIDE = [
   ]],
   ["Ver tu progreso", [
     "Hoy: tus calorías restantes, los km de la semana, tus horas de sueño y tus macros del día.",
-    "Resumen: elegí el período (4 semanas, 3 meses, 12 meses o todo) y vas a ver totales, gráficos frente a tus objetivos, tus récords y una tabla mes a mes.",
+    "Resumen: elegí el período (4 semanas, 3 meses, 12 meses o todo; también deslizando hacia los costados) y vas a ver totales, gráficos frente a tus objetivos, tus récords y una tabla mes a mes.",
     "En los gráficos, tocá una barra o un punto para ver el valor exacto.",
   ]],
   ["Copia de seguridad y salir", [
@@ -700,7 +700,7 @@ const TOUR = [
   { view: "today", target: ".quick", title: "Registrar rápido", text: "Desde acá anotás una carrera, una comida, tu peso o tu sueño en dos toques." },
   { view: "runs", target: ".fab", title: "Correr", text: "Tocá «+ Carrera» para cargar una a mano: el ritmo por km se calcula solo. Las de tu Garmin llegan solas vía Strava." },
   { view: "meals", target: ".fab", title: "Comidas", text: "Tocá «+ Comida», describí lo que comiste y tocá «Calcular macros con IA». También podés elegir una receta o escribir los macros. Para corregir una comida o cambiarla de momento, tocala." },
-  { view: "meals", target: ".subnav", title: "Semana y recetas", text: "En «Semana» repartís tus recetas en los días y armás la lista de compras con IA. En «Recetas» guardás tus platos con sus ingredientes; las ven las dos." },
+  { view: "meals", target: ".subnav", title: "Semana y recetas", text: "En «Semana» repartís tus recetas en los días y armás la lista de compras con IA. En «Recetas» guardás tus platos con sus ingredientes; las ven las dos. Tip: deslizá hacia los costados para cambiar de pestaña." },
   { view: "body", target: ".fab", title: "Peso, IMC y grasa", text: "Tocá «+ Peso» para anotar tu peso y, si la tenés, tu grasa corporal. El IMC se calcula con tu altura." },
   { view: "body", target: ".subnav", title: "Sueño", text: "En esta misma pantalla, la pestaña «Sueño» guarda a qué hora te acostaste, a qué hora te levantaste y cómo dormiste." },
   { view: "summary", target: ".period", title: "Resumen", text: "Elegí el período y vas a ver tus totales, gráficos frente a tus objetivos, récords y una tabla mes a mes." },
@@ -2035,6 +2035,48 @@ function render() {
 }
 
 window.addEventListener("hashchange", () => { if (account.user) go(location.hash.slice(1)); });
+
+/* ---------- deslizar entre pestañas internas ---------- */
+// en el mismo orden que se ven en pantalla
+const SWIPE_GROUPS = [["meals", "plan", "recipes"], ["body", "sleep"]];
+// donde deslizar tiene otro uso (gráficos, tabla que se desplaza, controles)
+const NO_SWIPE = ".chart, .table-wrap, input, select, textarea, .tour";
+let swipe = null;
+
+viewEl.addEventListener("touchstart", (e) => {
+  if (e.touches.length !== 1 || sheet.open || e.target.closest(NO_SWIPE)) { swipe = null; return; }
+  const t = e.touches[0];
+  swipe = { x: t.clientX, y: t.clientY, at: Date.now() };
+}, { passive: true });
+
+viewEl.addEventListener("touchend", (e) => {
+  if (!swipe || !account.user) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - swipe.x, dy = t.clientY - swipe.y, ms = Date.now() - swipe.at;
+  swipe = null;
+  // gesto claramente horizontal, largo y rápido: no confundirlo con el scroll
+  if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5 || ms > 700) return;
+  const step = dx < 0 ? 1 : -1;
+  if (state.view === "summary") {
+    // en Resumen, deslizar cambia el período
+    const keys = PERIODS.map(([k]) => k);
+    const k = keys[keys.indexOf(state.period) + step];
+    if (!k) return;
+    state.period = k;
+    render();
+  } else {
+    const group = SWIPE_GROUPS.find((g) => g.includes(state.view));
+    if (!group) return;
+    const next = group[group.indexOf(state.view) + step];
+    if (!next) return;
+    go(next);
+  }
+  viewEl.classList.remove("slide-from-right", "slide-from-left");
+  void viewEl.offsetWidth;   // reinicia la animación si se desliza dos veces seguidas
+  viewEl.classList.add(dx < 0 ? "slide-from-right" : "slide-from-left");
+}, { passive: true });
+
+viewEl.addEventListener("animationend", () => viewEl.classList.remove("slide-from-right", "slide-from-left"));
 
 // los gráficos se dibujan al ancho de la pantalla: redibujar al girar el móvil
 let resizeTimer;
