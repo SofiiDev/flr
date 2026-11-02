@@ -34,7 +34,7 @@ end $$;
 create table if not exists public.profiles (
   id                text primary key check (id ~ '^[a-z]{2,20}$'),
   name              text not null,
-  goals             jsonb not null default '{"kcal":2200,"p":140,"c":250,"f":70,"sleep":8,"km":30,"caffeine":400}',
+  goals             jsonb not null default '{"kcal":2200,"p":140,"c":250,"f":70,"sleep":8,"km":30,"caffeine":400,"water":2000}',
   height_cm         numeric(5,1) check (height_cm is null or height_cm between 100 and 250),
   prefs             jsonb not null default '{}',     -- { "accent": "rosa", "mode": "system" }
   strava_athlete_id bigint unique,
@@ -76,8 +76,10 @@ create table if not exists public.recipes (
   c           numeric(7,1) not null default 0,
   f           numeric(7,1) not null default 0,
   items       jsonb not null default '[]',
+  caffeine_mg numeric(7,1) not null default 0,   -- cafeína de la receta completa
   updated_at  timestamptz not null default now()
 );
+alter table public.recipes add column if not exists caffeine_mg numeric(7,1) not null default 0;
 
 -- ---------- Comidas ----------
 create table if not exists public.meals (
@@ -137,9 +139,22 @@ create table if not exists public.caffeine (
   yerba_g     numeric(6,1),
   description text not null default '',
   caffeine_mg numeric(7,1) not null default 0 check (caffeine_mg >= 0),
+  recipe_id   uuid references public.recipes (id) on delete set null,
   created_at  timestamptz not null default now()
 );
 create index if not exists caffeine_profile_date on public.caffeine (profile_id, date);
+alter table public.caffeine add column if not exists recipe_id uuid references public.recipes (id) on delete set null;
+
+-- ---------- Agua ----------
+create table if not exists public.water (
+  id         uuid primary key default gen_random_uuid(),
+  profile_id text not null references public.profiles (id) on delete cascade,
+  date       date not null,
+  time       time not null default '12:00',
+  ml         integer not null check (ml between 1 and 5000),
+  created_at timestamptz not null default now()
+);
+create index if not exists water_profile_date on public.water (profile_id, date);
 
 -- ---------- Plan semanal: qué receta se come cada día ----------
 create table if not exists public.meal_plan (
@@ -181,12 +196,13 @@ alter table public.meals         enable row level security;
 alter table public.sleep         enable row level security;
 alter table public.body_metrics  enable row level security;
 alter table public.caffeine      enable row level security;
+alter table public.water         enable row level security;
 alter table public.meal_plan     enable row level security;
 alter table public.shopping_lists enable row level security;
 alter table public.strava_tokens enable row level security;
 
 revoke all on public.profiles, public.runs, public.recipes, public.meals, public.sleep,
-  public.body_metrics, public.caffeine, public.meal_plan, public.shopping_lists, public.strava_tokens from anon, authenticated;
+  public.body_metrics, public.caffeine, public.water, public.meal_plan, public.shopping_lists, public.strava_tokens from anon, authenticated;
 
 -- que la API de Supabase vea las tablas nuevas sin esperar
 notify pgrst, 'reload schema';

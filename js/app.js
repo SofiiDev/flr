@@ -430,6 +430,21 @@ function mealForm(rec, preset = {}) {
     macros.el,
     formActions(rec && (() => { remove("meals", m.id); closeSheet(); toast("Comida eliminada"); render(); })),
   );
+  if (rec && !rec.recipeId) {
+    form.insertBefore(h("button", {
+      type: "button", class: "btn ghost block", icon: "recipes", style: "margin-bottom:12px",
+      onclick: () => {
+        const v = macros.read();
+        const recipe = upsert("recipes", {
+          id: uid(), name: name.value.trim() || m.name, servings: 1,
+          ingredients: desc || items.map((i) => `${i.quantity ? `${i.quantity} ` : ""}${i.name}`).join("\n"),
+          items, ...v, kcal: v.kcal || kcalFromMacros(v.p, v.c, v.f), caf: sum(items, "caf"), owner: account.user.id,
+        });
+        upsert("meals", { ...m, recipeId: recipe.id, servings: 1 });
+        closeSheet(); toast(`Guardada como receta: ${recipe.name}`); render();
+      },
+    }, "Guardar como receta"), form.lastChild);
+  }
   openSheet(rec ? "Editar comida" : "Nueva comida", form);
 }
 
@@ -442,15 +457,17 @@ function recipeForm(rec) {
   let items = r.items || [];
   let ingredients = r.ingredients || "";
 
+  const caf = numInput("caf", r.caf ? Math.round(r.caf) : "", { int: true, placeholder: "0" });
   const perServing = h("b", { class: "num" }, "—");
   const perMacros = h("span", { class: "num" }, "");
   const updatePer = () => {
-    const v = macros.read(), n = readNum(servings) || 1;
-    perServing.textContent = v.kcal ? `${fmt0(v.kcal / n)} kcal` : "—";
-    perMacros.textContent = v.kcal ? `P ${fmt0(v.p / n)} · C ${fmt0(v.c / n)} · G ${fmt0(v.f / n)}` : "";
+    const v = macros.read(), n = readNum(servings) || 1, mg = readNum(caf);
+    perServing.textContent = v.kcal || mg ? `${fmt0(v.kcal / n)} kcal` : "—";
+    perMacros.textContent = v.kcal || mg ? `P ${fmt0(v.p / n)} · C ${fmt0(v.c / n)} · G ${fmt0(v.f / n)}${mg ? ` · ${fmt0(mg / n)} mg cafeína` : ""}` : "";
   };
   macros.el.addEventListener("input", updatePer);
   servings.addEventListener("input", updatePer);
+  caf.addEventListener("input", updatePer);
 
   const ai = aiBox({
     label: "Ingredientes (uno por línea)",
@@ -458,8 +475,8 @@ function recipeForm(rec) {
     hint: "Poné la cantidad de la receta completa. Después se divide por las porciones.",
     text: ingredients, items,
     getServings: () => readNum(servings) || 1,
-    onEdit: (list, total) => { items = list; macros.set(total); updatePer(); },
-    onResult: (data) => { items = data.items; ingredients = data.text; macros.set(data.total); updatePer(); },
+    onEdit: (list, total) => { items = list; macros.set(total); caf.value = sum(list, "caf") ? String(Math.round(sum(list, "caf"))) : ""; updatePer(); },
+    onResult: (data) => { items = data.items; ingredients = data.text; macros.set(data.total); caf.value = data.total.caf ? String(Math.round(data.total.caf)) : ""; updatePer(); },
   });
 
   const form = sheetForm(() => {
@@ -468,7 +485,7 @@ function recipeForm(rec) {
     const saved = upsert("recipes", {
       id: r.id || uid(), name: name.value.trim(), servings: readNum(servings) || 1,
       ingredients: ai.querySelector("textarea").value.trim() || ingredients, items,
-      ...v, kcal: v.kcal || kcalFromMacros(v.p, v.c, v.f),
+      ...v, kcal: v.kcal || kcalFromMacros(v.p, v.c, v.f), caf: readNum(caf), owner: r.owner || account.user.id,
     });
     closeSheet(); toast(rec ? "Receta actualizada" : "Receta guardada"); render();
     return saved;
@@ -478,6 +495,7 @@ function recipeForm(rec) {
     ai,
     h("p", { class: "eyebrow", style: "margin-bottom:8px" }, "Total de la receta"),
     macros.el,
+    field("Cafeína (mg, receta completa)", caf, "La calcula la IA si la receta lleva café, yerba, té o cacao. Así la podés elegir desde «+ Mate o café»."),
     h("div", { class: "live", "aria-live": "polite" }, h("span", {}, "Por porción ", perServing), perMacros),
     rec && h("button", {
       type: "button", class: "btn ghost block", style: "margin-bottom:12px",
@@ -921,6 +939,23 @@ async function syncStrava({ button, silent } = {}) {
   }
 }
 
+/* ============ quién creó cada receta ============ */
+
+const personName = (pid) => account.people.find((x) => x.id === pid)?.name || "";
+/** Color de una persona: su acento; si coincide con el mío, uno distinto para no confundirlas. */
+function ownerColor(pid) {
+  const mine = cleanPrefs(account.profile?.prefs).accent;
+  let accent = cleanPrefs(account.people.find((x) => x.id === pid)?.prefs).accent;
+  if (pid !== account.user?.id && accent === mine) accent = mine === "violeta" ? "turquesa" : "violeta";
+  return ACCENT_INFO[accent];
+}
+function ownerBadge(pid) {
+  if (!pid) return h("span", { class: "badge", icon: "recipes" });
+  const [, light, dark] = ownerColor(pid);
+  return h("span", { class: "badge owner", style: `--own-l: ${light}; --own-d: ${dark}`, title: `Receta de ${personName(pid)}`, "aria-label": `De ${personName(pid)}` },
+    (personName(pid) || "?").charAt(0));
+}
+
 /* ============ mate y cafeína ============ */
 
 // [nombre, unidad singular, unidad plural, mg por unidad para la estimación rápida]
@@ -978,25 +1013,71 @@ function caffeineForm(rec, preset = {}) {
     }
   });
 
+  // recetas con cafeína (mi café con leche, mi mate de siempre…)
+  const cafRecipes = db.recipes.filter((r) => r.caf > 0).sort((a, b) => a.name.localeCompare(b.name, "es"));
+  const recipeSel = h("select", { name: "recipe" },
+    h("option", { value: "" }, "— Ninguna —"),
+    cafRecipes.map((r) => h("option", { value: r.id, selected: r.id === x.recipeId }, `${r.name} · ${fmt0(r.caf / r.servings)} mg por porción`)));
+  const addKcal = h("input", { type: "checkbox", name: "addKcal", checked: !rec });
+  const kcalRow = h("label", { class: "check-line", hidden: true }, addKcal, h("span", {}, ""));
+  const applyRecipe = () => {
+    const r = recipeById(recipeSel.value);
+    kcalRow.hidden = !r || !r.kcal || Boolean(rec);
+    if (!r) return;
+    const n = readNum(amount) || 1;
+    mg.value = String(Math.round((r.caf / r.servings) * n)); mgTouched = true;
+    kcalRow.lastChild.textContent = `Sumar también sus calorías al diario (${fmt0((r.kcal / r.servings) * n)} kcal)`;
+    const guess = /yerba|mate/i.test(r.name) ? "mate" : /caf[eé]/i.test(r.name) ? "cafe" : /\bt[eé]\b/i.test(r.name) ? "te" : null;
+    if (guess && !rec) { const radio = form.querySelector(`input[name="kind"][value="${guess}"]`); if (radio) radio.checked = true; refresh(); }
+  };
+  recipeSel.addEventListener("change", applyRecipe);
+  amount.addEventListener("input", () => { if (recipeSel.value) applyRecipe(); });
+
   const form = sheetForm((f) => {
     const k = checked(f, "kind");
     const n = readNum(amount) || 1;
     const value = mgTouched && mg.value.trim() !== "" ? readNum(mg) : quickCaffeine(k, n, readNum(yerbaG));
+    const r = recipeById(recipeSel.value);
     upsert("caffeine", {
       id: x.id || uid(), date: date.value || todayISO(), time: time.value || nowTime(), kind: k, amount: n,
       yerba: k === "mate" ? yerba.value.trim() : "", yerbaG: k === "mate" ? readNum(yerbaG) || null : null,
-      desc: desc.value.trim(), mg: value,
+      desc: desc.value.trim(), mg: value, recipeId: r?.id || "",
     });
+    // café con leche y similares: sus calorías van al diario como comida
+    if (r && r.kcal && !rec && addKcal.checked) {
+      const kk = n / r.servings;
+      const hr = Number((time.value || nowTime()).slice(0, 2));
+      upsert("meals", {
+        date: date.value || todayISO(), time: time.value || nowTime(), slot: hr < 11 ? "desayuno" : hr < 16 ? "comida" : hr < 20 ? "merienda" : "cena",
+        name: r.name, kcal: r.kcal * kk, p: r.p * kk, c: r.c * kk, f: r.f * kk, recipeId: r.id, servings: n,
+      });
+    }
     closeSheet(); toast(rec ? "Registro actualizado" : `Anotado: ${fmt0(value)} mg de cafeína`); render();
   },
     h("div", { class: "field" }, h("span", { class: "label" }, "Qué tomaste"),
       segmented("kind", CAFFEINE_KINDS.map((k) => [k, KIND_INFO[k][0]]), x.kind, "Tipo de bebida")),
     h("div", { class: "row" }, field("Fecha", date), field("Hora", time)),
+    cafRecipes.length > 0 && field("Desde una receta", recipeSel, "Tus recetas con cafeína: elegila y se carga sola."),
     h("div", { class: "field" }, amountLabel, amount),
+    kcalRow,
     mateFields,
     field("Detalle (opcional)", desc),
     h("div", { class: "ai-box" }, ai, note, status),
     field("Cafeína (mg)", mg, "Calculala con IA o escribila. Si la dejás vacía, usamos la estimación que ves en gris."),
+    rec && !x.recipeId && h("button", {
+      type: "button", class: "btn ghost block", icon: "recipes", style: "margin-bottom:12px",
+      onclick: () => {
+        const k = kindNow(), n = readNum(amount) || 1;
+        const label = k === "mate" ? `Mate${yerba.value.trim() ? ` ${yerba.value.trim()}` : ""}${readNum(yerbaG) ? ` ${fmt0(readNum(yerbaG) / n)} g` : ""}` : KIND_INFO[k][0];
+        const recipe = upsert("recipes", {
+          id: uid(), name: label, servings: n,
+          ingredients: k === "mate" && readNum(yerbaG) ? `${fmt0(readNum(yerbaG))} g de yerba ${yerba.value.trim()}`.trim() : desc.value.trim() || label,
+          kcal: 0, p: 0, c: 0, f: 0, items: [], caf: readNum(mg) || quickCaffeine(k, n, readNum(yerbaG)), owner: account.user.id,
+        });
+        upsert("caffeine", { ...x, recipeId: recipe.id });
+        closeSheet(); toast(`Guardado como receta: ${recipe.name}. La próxima vez elegila en «Desde una receta».`); render();
+      },
+    }, "Guardar como receta"),
     formActions(rec && (() => { remove("caffeine", x.id); closeSheet(); toast("Registro eliminado"); render(); })),
   );
   form.addEventListener("change", refresh);
@@ -1004,6 +1085,7 @@ function caffeineForm(rec, preset = {}) {
   yerbaG.addEventListener("input", refresh);
   openSheet(rec ? "Editar mate o café" : "Mate o café", form);
   refresh();
+  if (x.recipeId) applyRecipe();
 }
 
 function caffeineItem(x) {
@@ -1011,7 +1093,9 @@ function caffeineItem(x) {
     h("button", { type: "button", class: "item-btn", onclick: () => caffeineForm(x) },
       h("span", { class: "badge mate", icon: "mate" }),
       h("span", { class: "item-main" },
-        h("span", { class: "item-title", style: "display:block" }, `${fmt1(x.amount)} ${unitOf(x.kind, x.amount)}${x.kind === "mate" ? " de mate" : x.kind === "otro" ? "" : ` de ${KIND_INFO[x.kind][0].toLowerCase()}`}`),
+        h("span", { class: "item-title", style: "display:block" }, recipeById(x.recipeId)
+          ? `${recipeById(x.recipeId).name} · ${fmt1(x.amount)} ${unitOf(x.kind, x.amount)}`
+          : `${fmt1(x.amount)} ${unitOf(x.kind, x.amount)}${x.kind === "mate" ? " de mate" : x.kind === "otro" ? "" : ` de ${KIND_INFO[x.kind][0].toLowerCase()}`}`),
         h("span", { class: "item-sub" }, x.time, x.yerba && ` · ${x.yerba}`, x.yerbaG ? ` · ${fmt0(x.yerbaG)} g` : "")),
       h("span", { class: "item-end num" }, fmt0(x.mg), h("small", {}, "mg"))));
 }
@@ -1364,7 +1448,7 @@ function sleepItem(s) {
 
 /* ============ vistas ============ */
 
-const state = { view: "today", mealDate: todayISO(), planWeek: weekStart(todayISO()), period: "3m" };
+const state = { view: "today", mealDate: todayISO(), planWeek: weekStart(todayISO()), period: "3m", recipeFilter: "all" };
 
 const VIEWS = {
   today: { title: "Hoy", tab: "today", render: viewToday },
@@ -1560,22 +1644,33 @@ function viewPlan() {
 }
 
 function viewRecipes() {
-  const recipes = [...db.recipes].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  const me = account.user.id;
+  const other = account.people.find((x) => x.id !== me);
+  const filter = state.recipeFilter;
+  const all = [...db.recipes].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  const recipes = all.filter((r) => filter === "mine" ? r.owner === me : filter === "other" ? r.owner && r.owner !== me : true);
+  const options = [["all", "Todas"], ["mine", "Mías"], ...(other ? [["other", `De ${other.name}`]] : [])];
   return [
     mealsNav("recipes"),
-    h("p", { class: "muted", style: "margin-bottom:16px" },
-      "Compartidas entre Sofi y Flor. Guardá tus recetas con sus ingredientes: la IA calcula los macros y después registrás porciones en un toque."),
-    h("section", { class: "card", "aria-label": "Mis recetas" },
+    h("p", { class: "muted", style: "margin-bottom:12px" },
+      `Las recetas son compartidas: la inicial de color muestra de quién es cada una. Guardá tus platos, tu café con leche o tu mate de siempre y registralos en un toque.`),
+    h("div", { class: "seg recipe-filter", role: "radiogroup", "aria-label": "Filtrar recetas" },
+      options.map(([k, label]) => h("label", {},
+        h("input", { type: "radio", name: "recipeFilter", value: k, checked: k === filter, onchange: () => { state.recipeFilter = k; render(); } }),
+        h("span", {}, label)))),
+    h("section", { class: "card", "aria-label": "Recetas" },
       recipes.length
         ? h("ul", { class: "list" }, recipes.map((r) => h("li", { class: "item" },
             h("button", { type: "button", class: "item-btn", onclick: () => recipeForm(r) },
-              h("span", { class: "badge", icon: "recipes" }),
+              ownerBadge(r.owner),
               h("span", { class: "item-main" },
                 h("span", { class: "item-title", style: "display:block" }, r.name),
                 h("span", { class: "item-sub num" },
-                  `${fmt0(r.servings)} porc. · P ${fmt0(r.p / r.servings)} · C ${fmt0(r.c / r.servings)} · G ${fmt0(r.f / r.servings)}`)),
+                  r.owner ? `${r.owner === me ? "Tuya" : `De ${personName(r.owner)}`} · ` : "",
+                  `${fmt0(r.servings)} porc. · P ${fmt0(r.p / r.servings)} · C ${fmt0(r.c / r.servings)} · G ${fmt0(r.f / r.servings)}`,
+                  r.caf ? ` · ${fmt0(r.caf / r.servings)} mg cafeína` : "")),
               h("span", { class: "item-end num" }, fmt0(r.kcal / r.servings), h("small", {}, "kcal/porción"))))))
-        : emptyState("recipes", "Todavía no tenés recetas", "Agregá una con sus ingredientes y cantidades.")),
+        : emptyState("recipes", filter === "all" ? "Todavía no hay recetas" : "No hay recetas en este filtro", "Agregá una con sus ingredientes y cantidades.")),
     fab("Receta", () => recipeForm()),
   ];
 }

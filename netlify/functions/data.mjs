@@ -16,13 +16,14 @@ const COLUMNS = {
   meals: ["id", "date", "time", "slot", "name", "kcal", "p", "c", "f", "recipe_id", "servings", "items", "description"],
   sleep: ["id", "date", "bed", "wake", "hours", "quality", "notes"],
   body_metrics: ["id", "date", "weight_kg", "body_fat_pct", "notes"],
-  recipes: ["id", "name", "servings", "ingredients", "kcal", "p", "c", "f", "items", "updated_at"],
-  caffeine: ["id", "date", "time", "kind", "amount", "yerba", "yerba_g", "description", "caffeine_mg"],
+  recipes: ["id", "name", "servings", "ingredients", "kcal", "p", "c", "f", "items", "caffeine_mg", "updated_at"],
+  caffeine: ["id", "date", "time", "kind", "amount", "yerba", "yerba_g", "description", "caffeine_mg", "recipe_id"],
+  water: ["id", "date", "time", "ml"],
   meal_plan: ["id", "date", "slot", "recipe_id", "servings"],
   shopping_lists: ["id", "week_start", "sections", "updated_at"],
 };
 // con profile_id; las recetas son compartidas
-const OWNED = ["runs", "meals", "sleep", "body_metrics", "caffeine", "meal_plan", "shopping_lists"];
+const OWNED = ["runs", "meals", "sleep", "body_metrics", "caffeine", "water", "meal_plan", "shopping_lists"];
 const PROFILE_FIELDS = ["goals", "height_cm", "prefs"];
 
 const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => obj?.[k] !== undefined).map((k) => [k, obj[k]]));
@@ -52,18 +53,22 @@ export default async (req) => {
         clean.profile_id = profile;
       } else if (!checkOwner) {
         clean.created_by = profile;
+      } else if (clean.id) {
+        const existing = must(await db.from(table).select("id").eq("id", clean.id).maybeSingle());
+        if (!existing) clean.created_by = profile;   // receta nueva: queda a nombre de quien la crea
       }
       return clean;
     };
 
     switch (body.action) {
       case "load": {
-        const [prof, ...lists] = await Promise.all([
+        const [prof, people, ...lists] = await Promise.all([
           db.from("profiles").select("id, name, goals, height_cm, prefs, strava_athlete_id, strava_synced_at").eq("id", profile).single(),
+          db.from("profiles").select("id, name, prefs"),
           ...OWNED.map((t) => db.from(t).select("*").eq("profile_id", profile)),
           db.from("recipes").select("*"),
         ]);
-        const out = { profile: must(prof) };
+        const out = { profile: must(prof), people: must(people) };
         OWNED.forEach((t, i) => { out[t] = must(lists[i]); });
         out.recipes = must(lists.at(-1));
         return json(out);

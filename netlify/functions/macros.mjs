@@ -14,6 +14,7 @@ Desglosa el texto del usuario en alimentos o ingredientes y estima para cada uno
 - Si falta la cantidad, asume una ración estándar y escríbela en "quantity" (por ejemplo "1 unidad (~120 g)").
 - Interpreta medidas caseras de España y Latinoamérica (cda, cdta, taza, puñado, rebanada).
 - "name" en español rioplatense (Argentina y Uruguay: palta, banana, frutilla, morrón, choclo, zapallo, durazno) y breve. "notes": una o dos frases con las suposiciones importantes, o cadena vacía.
+- "caffeine_mg": cafeína de esa cantidad (café, yerba mate, té, cacao, gaseosas cola, energizantes); 0 si no tiene.
 - Si el texto no describe alimentos, devuelve items vacío y explícalo en "notes".`;
 
 const SCHEMA = {
@@ -30,8 +31,9 @@ const SCHEMA = {
           protein_g: { type: "number" },
           carbs_g: { type: "number" },
           fat_g: { type: "number" },
+          caffeine_mg: { type: "number" },
         },
-        required: ["name", "quantity", "kcal", "protein_g", "carbs_g", "fat_g"],
+        required: ["name", "quantity", "kcal", "protein_g", "carbs_g", "fat_g", "caffeine_mg"],
         additionalProperties: false,
       },
     },
@@ -126,8 +128,9 @@ export default async (req) => {
     p: num(i.protein_g),
     c: num(i.carbs_g),
     f: num(i.fat_g),
+    caf: num(i.caffeine_mg),
   }));
-  const total = ["kcal", "p", "c", "f"].reduce(
+  const total = ["kcal", "p", "c", "f", "caf"].reduce(
     (acc, k) => ({ ...acc, [k]: num(items.reduce((a, i) => a + i[k], 0)) }),
     {}
   );

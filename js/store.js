@@ -5,7 +5,7 @@
    El navegador nunca habla con Supabase: el servidor comprueba la sesión
    y decide qué puede leer o escribir cada perfil. */
 
-export const DEFAULT_GOALS = { kcal: 2200, p: 140, c: 250, f: 70, sleep: 8, km: 30, caffeine: 400 };
+export const DEFAULT_GOALS = { kcal: 2200, p: 140, c: 250, f: 70, sleep: 8, km: 30, caffeine: 400, water: 2000 };
 export const CAFFEINE_KINDS = ["mate", "cafe", "te", "energizante", "otro"];
 
 /* ---------- sesión (usuario y contraseña, recordada en el móvil) ---------- */
@@ -85,7 +85,7 @@ const clean = {
     id: id(r.id), name: str(r.name, 120) || "Receta",
     servings: num(r.servings, 1, 100) || 1, ingredients: str(r.ingredients, 4000),
     kcal: num(r.kcal, 0, 100000), p: num(r.p, 0, 10000), c: num(r.c, 0, 10000), f: num(r.f, 0, 10000),
-    items: cleanItems(r.items),
+    caf: num(r.caf, 0, 50000), items: cleanItems(r.items), owner: str(r.owner, 20),
   },
   body: (b) => isDate(b?.date) && num(b.weight, 20, 400) > 0 && {
     id: id(b.id), date: b.date,
@@ -98,7 +98,10 @@ const clean = {
     kind: CAFFEINE_KINDS.includes(x.kind) ? x.kind : "otro",
     amount: num(x.amount, 0.25, 50) || 1, yerba: str(x.yerba, 120),
     yerbaG: x.yerbaG == null || x.yerbaG === "" || !num(x.yerbaG) ? null : num(x.yerbaG, 1, 1000),
-    desc: str(x.desc, 1000), mg: Math.round(num(x.mg, 0, 5000)),
+    desc: str(x.desc, 1000), mg: Math.round(num(x.mg, 0, 5000)), recipeId: str(x.recipeId, 40),
+  },
+  water: (x) => isDate(x?.date) && num(x.ml, 1, 5000) > 0 && {
+    id: id(x.id), date: x.date, time: hhmm(x.time, "12:00"), ml: Math.round(num(x.ml, 1, 5000)),
   },
   plan: (x) => isDate(x?.date) && typeof x.recipeId === "string" && x.recipeId && {
     id: id(x.id), date: x.date, slot: str(x.slot, 20) || "comida",
@@ -125,6 +128,7 @@ function cleanItems(items) {
   return items.slice(0, 60).map((i) => ({
     name: str(i?.name, 120), quantity: str(i?.quantity, 60),
     kcal: num(i?.kcal, 0, 20000), p: num(i?.p, 0, 2000), c: num(i?.c, 0, 2000), f: num(i?.f, 0, 2000),
+    caf: num(i?.caf, 0, 5000),
   }));
 }
 
@@ -137,6 +141,7 @@ const cleanGoals = (g = {}) => ({
   km: num(g.km, 0, 1000) || DEFAULT_GOALS.km,
   weight: num(g.weight, 0, 400) >= 20 ? num(g.weight, 20, 400) : 0,   // 0 = sin objetivo
   caffeine: num(g.caffeine, 50, 2000) || DEFAULT_GOALS.caffeine,     // límite diario en mg
+  water: num(g.water, 250, 8000) || DEFAULT_GOALS.water,             // objetivo diario en ml
 });
 
 /* ---------- filas de la base de datos ⇄ objetos de la app ---------- */
@@ -144,10 +149,11 @@ const cleanGoals = (g = {}) => ({
 const fromRow = {
   runs: (r) => ({ ...r, avgHr: r.avg_hr }),
   meals: (m) => ({ ...m, recipeId: m.recipe_id || "", desc: m.description }),
-  recipes: (r) => r,
+  recipes: (r) => ({ ...r, owner: r.created_by || "", caf: r.caffeine_mg }),
   sleep: (s) => s,
   body: (b) => ({ ...b, weight: b.weight_kg, fat: b.body_fat_pct }),
-  caffeine: (x) => ({ ...x, yerbaG: x.yerba_g, desc: x.description, mg: x.caffeine_mg }),
+  caffeine: (x) => ({ ...x, yerbaG: x.yerba_g, desc: x.description, mg: x.caffeine_mg, recipeId: x.recipe_id || "" }),
+  water: (x) => x,
   plan: (x) => ({ ...x, recipeId: x.recipe_id }),
   shopping: (x) => ({ ...x, weekStart: x.week_start }),
 };
@@ -161,27 +167,29 @@ const toRow = {
   }),
   recipes: (r) => ({
     id: r.id, name: r.name, servings: r.servings, ingredients: r.ingredients,
-    kcal: r.kcal, p: r.p, c: r.c, f: r.f, items: r.items, updated_at: new Date().toISOString(),
+    kcal: r.kcal, p: r.p, c: r.c, f: r.f, items: r.items, caffeine_mg: r.caf, updated_at: new Date().toISOString(),
   }),
   sleep: (s) => ({ id: s.id, date: s.date, bed: s.bed, wake: s.wake, hours: s.hours, quality: s.quality, notes: s.notes }),
   body: (b) => ({ id: b.id, date: b.date, weight_kg: b.weight, body_fat_pct: b.fat, notes: b.notes }),
-  caffeine: (x) => ({ id: x.id, date: x.date, time: x.time, kind: x.kind, amount: x.amount, yerba: x.yerba, yerba_g: x.yerbaG, description: x.desc, caffeine_mg: x.mg }),
+  caffeine: (x) => ({ id: x.id, date: x.date, time: x.time, kind: x.kind, amount: x.amount, yerba: x.yerba, yerba_g: x.yerbaG, description: x.desc, caffeine_mg: x.mg, recipe_id: x.recipeId || null }),
+  water: (x) => ({ id: x.id, date: x.date, time: x.time, ml: x.ml }),
   plan: (x) => ({ id: x.id, date: x.date, slot: x.slot, recipe_id: x.recipeId, servings: x.servings }),
   shopping: (x) => ({ id: x.id, week_start: x.weekStart, sections: x.sections, updated_at: new Date().toISOString() }),
 };
 
-const COLLECTIONS = ["runs", "meals", "recipes", "sleep", "body", "caffeine", "plan", "shopping"];
+const COLLECTIONS = ["runs", "meals", "recipes", "sleep", "body", "caffeine", "water", "plan", "shopping"];
 // nombre de la tabla en Supabase de cada colección
-const TABLE = { runs: "runs", meals: "meals", recipes: "recipes", sleep: "sleep", body: "body_metrics", caffeine: "caffeine", plan: "meal_plan", shopping: "shopping_lists" };
+const TABLE = { runs: "runs", meals: "meals", recipes: "recipes", sleep: "sleep", body: "body_metrics", caffeine: "caffeine", water: "water", plan: "meal_plan", shopping: "shopping_lists" };
 
-export const db = { runs: [], meals: [], recipes: [], sleep: [], body: [], caffeine: [], plan: [], shopping: [], goals: { ...DEFAULT_GOALS } };
-export const account = { user: null, profile: null, loadedAt: 0 };
+export const db = { runs: [], meals: [], recipes: [], sleep: [], body: [], caffeine: [], water: [], plan: [], shopping: [], goals: { ...DEFAULT_GOALS } };
+export const account = { user: null, profile: null, people: [], loadedAt: 0 };
 
 /* ---------- carga ---------- */
 
 export async function loadAll() {
   const data = await call("load");
   account.profile = data.profile;
+  account.people = Array.isArray(data.people) ? data.people : [];
   db.goals = cleanGoals(data.profile.goals);
   COLLECTIONS.forEach((c) => {
     db[c] = (data[TABLE[c]] || []).map((row) => clean[c](fromRow[c](row))).filter(Boolean);
@@ -261,10 +269,11 @@ export async function importJSON(text) {
     if (rec && c === "recipes") recipeIds.set(x.id, rec.id);
     if (rec && c === "meals") rec.recipeId = recipeIds.get(x.recipeId) || "";
     if (rec && c === "plan") rec.recipeId = recipeIds.get(x.recipeId) || "";   // sin su receta, se descarta
+    if (rec && c === "caffeine") rec.recipeId = recipeIds.get(x.recipeId) || "";
     return c === "plan" && !rec?.recipeId ? null : rec;
   }).filter(Boolean);
 
-  for (const c of ["recipes", "runs", "meals", "sleep", "body", "caffeine", "plan"]) {
+  for (const c of ["recipes", "runs", "meals", "sleep", "body", "caffeine", "water", "plan"]) {
     const list = fresh(c, raw[c]);
     for (let i = 0; i < list.length; i += 500) {
       await call("insert", { table: TABLE[c], rows: list.slice(i, i + 500).map(toRow[c]) });
