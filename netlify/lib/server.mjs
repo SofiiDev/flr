@@ -50,6 +50,10 @@ export function sameOrigin(req) {
 export function explainDbError(err) {
   const code = err?.code || "";
   const msg = `${err?.message || ""} ${err?.details || ""} ${err?.hint || ""}`;
+  // columna que todavía no existe (la app es más nueva que el esquema)
+  if (code === "PGRST204" || code === "42703" || /could not find the '.*' column|column .* does not exist/i.test(msg)) {
+    return "A la base de datos le faltan columnas nuevas: volvé a ejecutar supabase/schema.sql en el SQL Editor de Supabase.";
+  }
   if (code === "42P01" || code === "PGRST205" || /does not exist|schema cache/i.test(msg)) {
     return "Faltan las tablas en Supabase: ejecutá supabase/schema.sql en el SQL Editor.";
   }

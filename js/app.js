@@ -134,7 +134,7 @@ function toast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2600);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), Math.max(2600, msg.length * 60));   // los avisos largos duran más
 }
 
 const sheet = document.getElementById("sheet");
@@ -2519,7 +2519,8 @@ function takeUrlParams() {
 
 onWriteError((err) => {
   if (err instanceof SessionExpired) { renderLogin("Tu sesión venció. Volvé a entrar."); return; }
-  toast("No se pudo guardar el último cambio. Revisá tu conexión.");
+  // el servidor explica el motivo (p. ej. que falta actualizar el esquema de Supabase)
+  toast(err?.message && !/conect/i.test(err.message) ? `No se guardó: ${err.message}` : "No se pudo guardar el último cambio. Revisá tu conexión.");
   if (account.user) loadAll().then(render).catch(() => {});
 });
 
