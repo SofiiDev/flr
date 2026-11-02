@@ -117,17 +117,33 @@ export function sessionProfile(req) {
 
 /* ---------- Strava ---------- */
 
-export async function stravaTokenRequest(params) {
+/** Aplicación de Strava del perfil. Strava deja conectar una sola cuenta por aplicación
+ *  (hasta que la revisa), así que cada perfil puede tener la suya:
+ *  STRAVA_CLIENT_ID_SOFI / STRAVA_CLIENT_SECRET_SOFI, y si no, STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET. */
+export function stravaApp(profile) {
+  const own = (k) => process.env[`${k}_${String(profile).toUpperCase()}`];
+  const id = own("STRAVA_CLIENT_ID"), secret = own("STRAVA_CLIENT_SECRET");
+  if (id && secret) return { id, secret };
+  return { id: env("STRAVA_CLIENT_ID"), secret: env("STRAVA_CLIENT_SECRET") };
+}
+
+export async function stravaTokenRequest(profile, params) {
+  const app = stravaApp(profile);
   const res = await fetch("https://www.strava.com/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      client_id: env("STRAVA_CLIENT_ID"),
-      client_secret: env("STRAVA_CLIENT_SECRET"),
+      client_id: app.id,
+      client_secret: app.secret,
       ...params,
     }),
   });
-  if (!res.ok) throw new Error(`Strava token ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(`Strava token ${res.status} ${text.slice(0, 300)}`);
+    err.limit = /limit/i.test(text) && /athlete/i.test(text);   // "Limit of connected athletes exceeded"
+    throw err;
+  }
   return res.json();
 }
 
@@ -139,7 +155,7 @@ export async function stravaAccessToken(profileId) {
   if (!tok) return null;
   if (new Date(tok.expires_at).getTime() - Date.now() > 120_000) return tok.access_token;
 
-  const fresh = await stravaTokenRequest({ grant_type: "refresh_token", refresh_token: tok.refresh_token });
+  const fresh = await stravaTokenRequest(profileId, { grant_type: "refresh_token", refresh_token: tok.refresh_token });
   await db.from("strava_tokens").update({
     access_token: fresh.access_token,
     refresh_token: fresh.refresh_token,

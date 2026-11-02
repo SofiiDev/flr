@@ -20,10 +20,10 @@ export default async (req) => {
 
   let tok;
   try {
-    tok = await stravaTokenRequest({ grant_type: "authorization_code", code: url.searchParams.get("code") });
+    tok = await stravaTokenRequest(state.profile, { grant_type: "authorization_code", code: url.searchParams.get("code") });
   } catch (err) {
     console.error(err);
-    return back(req, { error: "strava_token" });
+    return back(req, { error: err.limit ? "strava_limit" : "strava_token" });
   }
 
   const db = supabaseAdmin();

@@ -52,12 +52,16 @@ Pestañas: Hoy · Correr · Comidas (Diario / Semana / Recetas) · Cuerpo (Peso 
 1. **Add new project → Import an existing project → GitHub** y elige este repositorio. No hace falta tocar la configuración: la lee de `netlify.toml`.
 2. Ponle nombre en **Site configuration → Change site name**, por ejemplo `florlovesrunning` → `https://florlovesrunning.netlify.app`.
 
-### 3. Strava
+### 3. Strava (una aplicación por perfil)
 
-1. En <https://www.strava.com/settings/api> crea una aplicación.
-2. *Authorization Callback Domain*: `florlovesrunning.netlify.app` (solo el dominio).
-3. Copia *Client ID* y *Client Secret*.
-4. En el móvil de quien vaya a sincronizar: **Garmin Connect → Ajustes → Aplicaciones conectadas → Strava**.
+Strava deja conectar **una sola cuenta** a cada aplicación nueva (la de quien la creó), así que cada una crea la suya:
+
+1. Entrá a <https://www.strava.com/settings/api> **con tu propia cuenta de Strava** y creá una aplicación (nombre: «FlorLovesRunning Sofi», categoría: *Data Importer*, sitio: la URL de la app).
+2. *Authorization Callback Domain*: el dominio de la app en Netlify (p. ej. `florlovesrunning.netlify.app`, sin `https://`).
+3. Copiá *Client ID* y *Client Secret* y cargalos en Netlify como `STRAVA_CLIENT_ID_SOFI` y `STRAVA_CLIENT_SECRET_SOFI` (Flor: `…_FLOR`).
+4. En el celular de cada una: **Garmin Connect → Ajustes → Aplicaciones conectadas → Strava**.
+
+`STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` (sin sufijo) siguen funcionando como aplicación común para el perfil que no tenga la suya.
 
 ### 4. Claude (IA de macros)
 
@@ -74,8 +78,8 @@ En <https://platform.claude.com> crea una API key y carga saldo en *Billing*.
 | `PASSWORD_SOFI` | contraseña de Sofi |
 | `PASSWORD_FLOR` | contraseña de Flor |
 | `STATE_SECRET` | texto aleatorio largo (p. ej. `openssl rand -hex 32`); firma las sesiones |
-| `STRAVA_CLIENT_ID` | de Strava |
-| `STRAVA_CLIENT_SECRET` | de Strava |
+| `STRAVA_CLIENT_ID_SOFI` / `STRAVA_CLIENT_SECRET_SOFI` | de la aplicación de Strava de Sofi |
+| `STRAVA_CLIENT_ID_FLOR` / `STRAVA_CLIENT_SECRET_FLOR` | de la aplicación de Strava de Flor |
 | `ANTHROPIC_API_KEY` | de Claude |
 
 Después: **Deploys → Trigger deploy → Clear cache and deploy site**.

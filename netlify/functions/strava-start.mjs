@@ -1,7 +1,7 @@
 /* FlorLovesRunning — conectar Strava al perfil con sesión
    POST /api/strava/start (Bearer) → { url } de autorización de Strava */
 
-import { json, env, sameOrigin, sessionProfile, makeToken, ConfigError } from "../lib/server.mjs";
+import { json, sameOrigin, sessionProfile, makeToken, stravaApp, ConfigError } from "../lib/server.mjs";
 
 export default async (req) => {
   if (req.method !== "POST") return json({ error: "Método no permitido" }, 405);
@@ -11,7 +11,7 @@ export default async (req) => {
     if (!profile) return json({ error: "Iniciá sesión de nuevo" }, 401);
     const u = new URL("https://www.strava.com/oauth/authorize");
     u.search = new URLSearchParams({
-      client_id: env("STRAVA_CLIENT_ID"),
+      client_id: stravaApp(profile).id,
       redirect_uri: new URL("/api/strava/callback", req.url).href,
       response_type: "code",
       approval_prompt: "auto",

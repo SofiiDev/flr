@@ -6,7 +6,7 @@ import { db, account, session, setSession, api, SessionExpired, CAFFEINE_KINDS, 
 import { barChart, lineChart } from "./charts.js";
 
 // cambiala en cada actualización: se ve en Ajustes para saber si el celular ya tiene la última
-const APP_VERSION = "2026.11.02-5";
+const APP_VERSION = "2026.11.02-6";
 
 /* ============ utilidades ============ */
 
@@ -2439,7 +2439,8 @@ const STRAVA_ERRORS = {
   strava_denied: "Cancelaste la conexión con Strava.",
   strava_scope: "Para importar tus carreras, Strava necesita permiso para leer tus actividades.",
   strava_state: "El enlace de Strava venció. Probá de nuevo.",
-  strava_token: "Strava no respondió. Probá de nuevo.",
+  strava_token: "Strava no aceptó la conexión. Si la aplicación de Strava ya tiene otra cuenta conectada, cada perfil necesita la suya (ver README).",
+  strava_limit: "Esa aplicación de Strava ya tiene otra cuenta conectada: Strava permite una sola. Creá una aplicación propia y cargala en Netlify (STRAVA_CLIENT_ID_… del perfil).",
   strava_save: "No se pudo guardar la conexión con Strava.",
 };
 
