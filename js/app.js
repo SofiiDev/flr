@@ -1836,13 +1836,16 @@ function viewRuns() {
   const kmByDay = days.map((d) => sum(list.filter((r) => r.date === d), "km"));
   const longest = list.reduce((a, r) => Math.max(a, r.km), 0);
   const weekOf = (sp) => sum(all.filter((r) => r.date >= ws && (r.sport || "run") === sp), "km");
+  const monthOf = (sp) => sum(all.filter((r) => r.date >= ms && (r.sport || "run") === sp), "km");
+  const totalOf = (sp) => sum(all.filter((r) => (r.sport || "run") === sp), "km");
   const avg = monthTimed.length ? [sum(monthTimed, "sec"), sum(monthTimed, "km")] : null;
 
   const stats = filter === "all"
-    ? [stat(fmt1(weekOf("run")), "km", "Corriendo esta semana", `Objetivo ${fmt0(g.km)} km`),
-       stat(fmt1(weekOf("walk")), "km", "Caminando esta semana"),
-       stat(fmt1(weekOf("ride")), "km", "En bici esta semana"),
-       stat(fmt1(sum(all.filter((r) => r.date >= ms), "km")), "km", "Este mes, en total")]
+    // cada deporte: km de la semana, y debajo el mes y el total histórico
+    ? [stat(fmt1(weekOf("run")), "km", "Corriendo esta semana", `Mes ${fmt1(monthOf("run"))} km · objetivo ${fmt0(g.km)}/sem`),
+       stat(fmt1(weekOf("walk")), "km", "Caminando esta semana", `Mes ${fmt1(monthOf("walk"))} km · total ${fmt0(totalOf("walk"))} km`),
+       stat(fmt1(weekOf("ride")), "km", "En bici esta semana", `Mes ${fmt1(monthOf("ride"))} km · total ${fmt0(totalOf("ride"))} km`),
+       stat(fmt1(sum(all.filter((r) => r.date >= ms), "km")), "km", "Este mes, en total", `Total histórico ${fmt0(sum(all, "km"))} km`)]
     : [stat(fmt1(sum(week, "km")), "km", "Esta semana", filter === "run" ? `Objetivo ${fmt0(g.km)} km` : null),
        stat(fmt1(sum(month, "km")), "km", "Este mes"),
        filter === "ride"
@@ -2218,8 +2221,8 @@ function viewSummary() {
       h("div", { class: "stats" },
         stat(fmt1(sum(runs, "km")), "km", "Corriendo", `${runs.length} ${runs.length === 1 ? "carrera" : "carreras"}`),
         stat(timed.length ? fmtDur(sum(timed, "sec") / sum(timed, "km")) : "—", "/km", "Ritmo medio corriendo"),
-        acts.some((r) => r.sport === "walk") && stat(fmt1(sum(acts.filter((r) => r.sport === "walk"), "km")), "km", "Caminando", `${acts.filter((r) => r.sport === "walk").length} caminatas`),
-        acts.some((r) => r.sport === "ride") && stat(fmt1(sum(acts.filter((r) => r.sport === "ride"), "km")), "km", "En bici", `${acts.filter((r) => r.sport === "ride").length} salidas`),
+        db.runs.some((r) => r.sport === "walk") && stat(fmt1(sum(acts.filter((r) => r.sport === "walk"), "km")), "km", "Caminando", (() => { const n = acts.filter((r) => r.sport === "walk").length; return `${n} ${n === 1 ? "caminata" : "caminatas"}`; })()),
+        db.runs.some((r) => r.sport === "ride") && stat(fmt1(sum(acts.filter((r) => r.sport === "ride"), "km")), "km", "En bici", (() => { const n = acts.filter((r) => r.sport === "ride").length; return `${n} ${n === 1 ? "salida" : "salidas"}`; })()),
         stat(meals.length ? fmt0(kcalPerDay(meals)) : "—", "kcal", "Calorías por día", `Objetivo ${fmt0(g.kcal)}`),
         stat(meals.length ? fmt0(sum(meals, "p") / new Set(meals.map((m) => m.date)).size) : "—", "g", "Proteína por día", `Objetivo ${fmt0(g.p)} g`),
         stat(sleep.length ? fmt1(avgOf(sleep, "hours")) : "—", "h", "Sueño medio", `Objetivo ${fmt1(g.sleep)} h`),
