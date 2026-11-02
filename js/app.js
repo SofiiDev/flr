@@ -2,7 +2,7 @@
    Vistas: Hoy · Correr · Comidas · Recetas · Sueño (+ Ajustes).
    Todo el contenido del usuario se inserta como texto (nunca HTML). */
 
-import { db, account, session, setSession, api, SessionExpired, CAFFEINE_KINDS, loadAll, upsert, remove, setGoals, setHeight, setPrefs, cleanPrefs, ACCENTS, exportJSON, importJSON, wipe, uid, flush, onWriteError } from "./store.js";
+import { db, account, session, setSession, api, SessionExpired, CAFFEINE_KINDS, HABIT_KINDS, loadAll, upsert, remove, setGoals, setHeight, setPrefs, cleanPrefs, ACCENTS, exportJSON, importJSON, wipe, uid, flush, onWriteError } from "./store.js";
 import { barChart, lineChart } from "./charts.js";
 
 /* ============ utilidades ============ */
@@ -719,6 +719,7 @@ const GUIDE = [
   ], "El límite lo cambiás en Ajustes → Objetivos. En Resumen ves la cafeína y los termos por día y su evolución."],
   ["Hábitos", [
     "En Hoy, en «Hábitos de hoy», tocá «Crear hábito» (o andá a Cuerpo → Hábitos y tocá «+ Hábito»). Elegí un nombre y un color.",
+    "En «Cómo se cumple» elegí «Lo marco yo» o un objetivo automático (correr, caminar o bici en km, dormir en horas, proteína en gramos). Ej.: «Caminar 10 km» se tacha solo el día que registrás 10 km caminando, a mano o desde Strava.",
     "Cada día, tocá el círculo de color en Hoy para marcarlo. Debajo ves tu semana y la racha de días seguidos.",
     "En Cuerpo → Hábitos elegí un hábito arriba y tachá o destachá cualquier día del mes; con las flechas cambiás de mes.",
     "Para editar un hábito (nombre o color), borrarlo o cambiar el orden, usá la lista «Tus hábitos» de esa pantalla.",
@@ -1254,11 +1255,46 @@ const HABIT_COLORS = {
 const habitStyle = (hb) => { const [, l, d] = HABIT_COLORS[hb.color] || HABIT_COLORS.rosa; return `--c-l: ${l}; --c-d: ${d}`; };
 const habitsSorted = () => [...db.habits].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name, "es"));
 const habitLog = (hid, d) => db.habitLogs.find((x) => x.habitId === hid && x.date === d);
-const habitDone = (hid, d) => Boolean(habitLog(hid, d));
+
+// hábitos automáticos: se cumplen solos cuando lo registrado del día llega al objetivo
+const HABIT_GOALS = {
+  run: { label: "Correr", unit: "km", verb: "corriste", src: () => db.runs.filter((r) => (r.sport || "run") === "run"), key: "km" },
+  walk: { label: "Caminar", unit: "km", verb: "caminaste", src: () => db.runs.filter((r) => r.sport === "walk"), key: "km" },
+  ride: { label: "Andar en bici", unit: "km", verb: "hiciste en bici", src: () => db.runs.filter((r) => r.sport === "ride"), key: "km" },
+  sleep: { label: "Dormir", unit: "h", verb: "dormiste", src: () => db.sleep, key: "hours" },
+  protein: { label: "Comer proteína", unit: "g", verb: "comiste", src: () => db.meals, key: "p" },
+};
+const habitById = (hid) => db.habits.find((x) => x.id === hid);
+const isAutoHabit = (hb) => Boolean(hb && HABIT_GOALS[hb.kind] && hb.target > 0);
+const fmtTarget = (v) => (Number.isInteger(v) ? fmt0(v) : fmt1(v));
+const habitGoalText = (hb) => `${HABIT_GOALS[hb.kind].label} ${fmtTarget(hb.target)} ${HABIT_GOALS[hb.kind].unit}`;
+function habitValue(hb, d) {
+  const g = HABIT_GOALS[hb.kind];
+  return g ? g.src().filter((x) => x.date === d).reduce((a, x) => a + (Number(x[g.key]) || 0), 0) : 0;
+}
+const habitAuto = (hb, d) => isAutoHabit(hb) && habitValue(hb, d) >= hb.target - 1e-9;
+const habitDone = (hid, d) => Boolean(habitLog(hid, d)) || habitAuto(habitById(hid), d);
+/** Todos los días cumplidos de un hábito (marcados a mano o automáticos), sin repetir. */
+function habitDates(hb) {
+  const set = new Set(db.habitLogs.filter((x) => x.habitId === hb.id).map((x) => x.date));
+  if (isAutoHabit(hb)) for (const d of new Set(HABIT_GOALS[hb.kind].src().map((x) => x.date))) if (habitAuto(hb, d)) set.add(d);
+  return set;
+}
+/** Días cumplidos y días posibles entre dos fechas, contando desde el primer día cumplido. */
+function habitRate(hb, from, to) {
+  const ds = [...habitDates(hb)];
+  if (!ds.length) return { done: 0, days: 0 };
+  const first = ds.reduce((m, d) => (d < m ? d : m));
+  const a = first > from ? first : from;
+  if (a > to) return { done: 0, days: 0 };
+  return { done: ds.filter((d) => d >= a && d <= to).length, days: Math.round((parseDate(to) - parseDate(a)) / 864e5) + 1 };
+}
 
 function toggleHabit(hid, d) {
-  const log = habitLog(hid, d);
-  if (log) remove("habitLogs", log.id);
+  const hb = habitById(hid), log = habitLog(hid, d);
+  const auto = () => `${capitalize(HABIT_GOALS[hb.kind].verb)} ${fmt1(habitValue(hb, d))} ${HABIT_GOALS[hb.kind].unit}: se cumple solo`;
+  if (log) { remove("habitLogs", log.id); if (habitAuto(hb, d)) toast(auto()); }
+  else if (habitAuto(hb, d)) { toast(auto()); return; }
   else upsert("habitLogs", { habitId: hid, date: d });
   render();
 }
@@ -1271,27 +1307,46 @@ function habitStreak(hid) {
   return n;
 }
 function habitBest(hid) {
-  const dates = db.habitLogs.filter((x) => x.habitId === hid).map((x) => x.date).sort();
+  const dates = [...habitDates(habitById(hid))].sort();
   let best = 0, cur = 0, prev = null;
   for (const d of dates) { cur = prev && addDays(prev, 1) === d ? cur + 1 : 1; best = Math.max(best, cur); prev = d; }
   return best;
 }
 
 function habitForm(rec) {
-  const hb = rec || { name: "", color: Object.keys(HABIT_COLORS)[db.habits.length % 7], position: db.habits.length };
+  const hb = rec || { name: "", color: Object.keys(HABIT_COLORS)[db.habits.length % 7], position: db.habits.length, kind: "manual", target: null };
   const name = h("input", { type: "text", name: "name", value: hb.name, maxlength: 60, placeholder: "Ej. Estirar 10 minutos", autocomplete: "off" });
+  const kind = h("select", { name: "kind" },
+    h("option", { value: "manual", selected: !isAutoHabit(hb) }, "Lo marco yo cada día"),
+    h("optgroup", { label: "Se cumple solo al llegar a un objetivo" },
+      Object.entries(HABIT_GOALS).map(([k, g]) => h("option", { value: k, selected: isAutoHabit(hb) && hb.kind === k }, `${g.label} (${g.unit} por día)`))));
+  const target = numInput("target", isAutoHabit(hb) ? hb.target : "", { placeholder: "10" });
+  const targetField = field("Objetivo por día", target,
+    "Cuando registres eso en el día (desde la app o Strava), el hábito se tacha solo. Igual podés marcarlo a mano.");
+  const sync = () => {
+    const g = HABIT_GOALS[kind.value];
+    targetField.hidden = !g;
+    if (g) targetField.querySelector("label").textContent = `Objetivo por día (${g.unit === "h" ? "horas" : g.unit})`;
+    name.placeholder = g ? `Ej. ${g.label} ${target.value || "10"} ${g.unit}` : "Ej. Estirar 10 minutos";
+  };
+  kind.addEventListener("change", sync); target.addEventListener("input", sync); sync();
   const form = sheetForm((f) => {
-    if (!name.value.trim()) { name.focus(); toast("Ponele un nombre al hábito"); return; }
-    upsert("habits", { id: hb.id || uid(), name: name.value.trim(), color: checked(f, "color") || hb.color, position: hb.position });
+    const auto = kind.value !== "manual", tv = readNum(target);
+    if (auto && !(tv > 0)) { target.focus(); toast("Poné el objetivo por día"); return; }
+    const nm = name.value.trim() || (auto ? `${HABIT_GOALS[kind.value].label} ${fmtTarget(tv)} ${HABIT_GOALS[kind.value].unit}` : "");
+    if (!nm) { name.focus(); toast("Ponele un nombre al hábito"); return; }
+    upsert("habits", { id: hb.id || uid(), name: nm, color: checked(f, "color") || hb.color, position: hb.position, kind: auto ? kind.value : "manual", target: auto ? tv : null });
     closeSheet(); toast(rec ? "Hábito actualizado" : "Hábito creado"); render();
   },
-    field("Nombre", name, "Algo concreto que puedas tachar cada día: «sin alcohol», «meditar», «vitaminas»…"),
+    field("Nombre", name, "Algo concreto que puedas tachar cada día: «sin alcohol», «meditar», «caminar 10 km»…"),
+    field("Cómo se cumple", kind),
+    targetField,
     h("div", { class: "field" }, h("span", { class: "label", id: "habitColorLabel" }, "Color"),
       h("div", { class: "swatches", role: "radiogroup", "aria-labelledby": "habitColorLabel" },
         Object.entries(HABIT_COLORS).map(([k, [label, l, d]]) => h("label", { class: "swatch", style: `--sw-l: ${l}; --sw-d: ${d}` },
           h("input", { type: "radio", name: "color", value: k, checked: k === hb.color }),
           h("span", {}, h("i"), label))))),
-    rec && h("p", { class: "hint", style: "margin:-4px 0 16px" }, `Racha actual: ${habitStreak(hb.id)} · mejor racha: ${habitBest(hb.id)} · ${db.habitLogs.filter((x) => x.habitId === hb.id).length} días cumplidos en total.`),
+    rec && h("p", { class: "hint", style: "margin:-4px 0 16px" }, `Racha actual: ${habitStreak(hb.id)} · mejor racha: ${habitBest(hb.id)} · ${habitDates(hb).size} días cumplidos en total.`),
     formActions(rec && (() => {
       db.habitLogs.filter((x) => x.habitId === hb.id).forEach((x) => { db.habitLogs = db.habitLogs.filter((y) => y.id !== x.id); });   // el servidor los borra en cascada
       remove("habits", hb.id);
@@ -1327,6 +1382,7 @@ function habitsCard() {
             h("button", { type: "button", class: "habit-check", "aria-pressed": String(on), "aria-label": `${hb.name}: ${on ? "hecho hoy, tocá para desmarcar" : "sin hacer, tocá para marcar"}`, icon: "check", onclick: () => toggleHabit(hb.id, t) }),
             h("div", { class: "habit-info" },
               h("span", { class: "habit-name" }, hb.name),
+              isAutoHabit(hb) && h("span", { class: "habit-goal num" }, `${fmt1(Math.min(habitValue(hb, t), 9999))} de ${fmtTarget(hb.target)} ${HABIT_GOALS[hb.kind].unit} hoy${on ? "" : " · se tacha solo"}`),
               h("span", { class: "habit-week", "aria-hidden": "true" }, last7().map((d) => h("i", { class: `${habitDone(hb.id, d) ? "on" : ""}${d === t ? " today" : ""}` })))),
             h("span", { class: "habit-streak num", title: "Racha de días seguidos" },
               streak ? h("span", { class: "flame", icon: "flame" }) : null,
@@ -1362,7 +1418,7 @@ function viewHabits() {
         h("span", { class: "mnav" },
           h("button", { type: "button", class: "icon-btn", icon: "left", "aria-label": "Mes anterior", onclick: () => { state.habitMonth--; render(); } }),
           h("button", { type: "button", class: "icon-btn", icon: "right", "aria-label": "Mes siguiente", disabled: off >= 0, onclick: () => { state.habitMonth++; render(); } }))),
-      h("p", { class: "hint", style: "margin:-4px 0 8px" }, "Tocá un día para tacharlo o destacharlo."),
+      h("p", { class: "hint", style: "margin:-4px 0 8px" }, isAutoHabit(hb) ? `Se tacha solo los días que llegás a ${habitGoalText(hb).toLowerCase()}. También podés tocar un día para marcarlo a mano.` : "Tocá un día para tacharlo o destacharlo."),
       h("div", { class: "cal-dow", "aria-hidden": "true" }, ["L", "M", "M", "J", "V", "S", "D"].map((x) => h("span", {}, x))),
       h("div", { class: "cal-grid" },
         Array.from({ length: lead }, () => h("span", { class: "cal-day out", "aria-hidden": "true" })),
@@ -1385,7 +1441,7 @@ function viewHabits() {
           h("span", { class: "habit-dot", "aria-hidden": "true" }),
           h("span", { class: "item-main" },
             h("span", { class: "item-title", style: "display:block" }, x.name),
-            h("span", { class: "item-sub num" }, `Racha ${habitStreak(x.id)} · mejor ${habitBest(x.id)}`))),
+            h("span", { class: "item-sub num" }, `${isAutoHabit(x) ? `Automático: ${habitGoalText(x).toLowerCase()} · ` : ""}Racha ${habitStreak(x.id)} · mejor ${habitBest(x.id)}`))),
         h("span", { class: "habit-order" },
           h("button", { type: "button", class: "icon-btn", icon: "up", "aria-label": `Subir ${x.name}`, disabled: i === 0, onclick: () => moveHabit(x.id, -1) }),
           h("button", { type: "button", class: "icon-btn", icon: "down", "aria-label": `Bajar ${x.name}`, disabled: i === list.length - 1, onclick: () => moveHabit(x.id, 1) })))))),
@@ -1672,7 +1728,7 @@ function subnav(items, current, label) {
     }, text)));
 }
 const mealsNav = (v) => subnav([["meals", "Diario"], ["plan", "Semana"], ["recipes", "Recetas"]], v, "Comidas");
-const bodyNav = (v) => subnav([["body", "Peso y grasa"], ["sleep", "Sueño"], ["habits", "Hábitos"]], v, "Cuerpo");
+const bodyNav = (v) => subnav([["body", "Peso"], ["sleep", "Sueño"], ["habits", "Hábitos"]], v, "Cuerpo");
 
 // ancho interior de una tarjeta, para dibujar los gráficos a su tamaño
 const chartWidth = () => Math.max(260, Math.min(640, viewEl.clientWidth) - 32 - 34);
@@ -2122,7 +2178,7 @@ function viewSummary() {
   const months = bucketList(unit === "month" ? start : start.slice(0, 8) + "01", "month").reverse();
   const mRuns = groupBy(db.runs.filter(isRun), "month"), mMeals = groupBy(db.meals, "month"), mSleep = groupBy(db.sleep, "month"), mBody = groupBy([...db.body].sort(byDateAsc), "month");
 
-  const empty = !acts.length && !meals.length && !sleep.length && !body.length && !caf.length && !db.habitLogs.some(inP);
+  const empty = !acts.length && !meals.length && !sleep.length && !body.length && !caf.length && !db.habits.length;
   const cafBy = groupBy(caf, unit);
   const cafData = buckets.map((b) => {
     const list = cafBy.get(b.key) || [];
@@ -2132,17 +2188,21 @@ function viewSummary() {
   });
   const mCaf = groupBy(db.caffeine, "month");
 
-  // hábitos: % de días cumplidos desde el inicio del período (o desde la primera marca)
+  // hábitos: % de días cumplidos desde el inicio del período (o desde el primer día cumplido)
   const tISO = todayISO();
-  const habitRates = habitsSorted().map((hb) => {
-    const logs = db.habitLogs.filter((x) => x.habitId === hb.id);
-    const first = logs.reduce((m, x) => (x.date < m ? x.date : m), tISO);
-    const from = first > start ? first : start;
-    const days = Math.round((parseDate(tISO) - parseDate(from)) / 864e5) + 1;
-    const done = logs.filter((x) => x.date >= from && x.date <= tISO).length;
-    return { hb, done, days, has: logs.length > 0, pct: logs.length ? Math.round((done / days) * 100) : 0 };
+  const habitRates = habitsSorted().map((hb) => ({ hb, ...habitRate(hb, start, tISO) }))
+    .map((x) => ({ ...x, pct: x.days ? Math.round((x.done / x.days) * 100) : 0 }));
+  const habitTotal = habitRates.reduce((a, x) => [a[0] + x.done, a[1] + x.days], [0, 0]);
+  const habitPctRange = (from, to) => {
+    const r = db.habits.map((hb) => habitRate(hb, from, to)).reduce((a, x) => [a[0] + x.done, a[1] + x.days], [0, 0]);
+    return r[1] ? (r[0] / r[1]) * 100 : null;
+  };
+  const bucketEnd = (b, i) => { const nx = buckets[i + 1]; const e = nx ? addDays(nx.key.length === 7 ? nx.key + "-01" : nx.key, -1) : tISO; return e > tISO ? tISO : e; };
+  const habitData = buckets.map((b, i) => {
+    const from = b.key.length === 7 ? b.key + "-01" : b.key;
+    const v = habitPctRange(from < start ? start : from, bucketEnd(b, i));
+    return { label: b.label, value: v || 0, tip: `${capitalize(b.long)} · ${v == null ? "sin datos" : `${fmt0(v)} % cumplido`}` };
   });
-  const habitTotal = habitRates.reduce((a, x) => [a[0] + x.done, a[1] + (x.has ? x.days : 0)], [0, 0]);
 
   return [
     h("div", { class: "seg period", role: "radiogroup", "aria-label": "Período" },
@@ -2168,15 +2228,19 @@ function viewSummary() {
         stat(cafDays ? fmt0(sum(caf, "mg") / cafDays) : "—", "mg", "Cafeína por día", `Límite ${fmt0(g.caffeine)} mg`),
         stat(cafDays ? fmt1(termosOf(caf) / cafDays) : "—", "", "Termos de mate por día", cafDays ? `${fmt1(termosOf(caf))} en total` : null),
         stat(fatList.length ? fmt1(fatList.at(-1).fat) : "—", "%", "Grasa corporal", fatList.length > 1 ? `${fmtDelta(fatList.at(-1).fat - fatList[0].fat, "pts")} en el período` : null),
-        habitRates.length > 0 && stat(habitTotal[1] ? fmt0((habitTotal[0] / habitTotal[1]) * 100) : "—", "%", "Hábitos cumplidos", `${habitTotal[0]} días tachados`))),
+        habitRates.length > 0 && stat(habitTotal[1] ? fmt0((habitTotal[0] / habitTotal[1]) * 100) : "—", "%", "Hábitos cumplidos", `${habitTotal[0]} ${habitTotal[0] === 1 ? "día tachado" : "días tachados"}`))),
 
-    habitRates.some((x) => x.done) && h("section", { class: "card", "aria-label": "Hábitos del período" },
+    habitRates.length > 0 && h("section", { class: "card", "aria-label": "Hábitos del período" },
       h("div", { class: "card-head" }, h("h2", {}, "Hábitos"), h("button", { type: "button", class: "link", onclick: () => go("habits") }, "Calendario")),
-      h("ul", { class: "list" }, habitRates.map(({ hb, done, days, has, pct }) => h("li", { class: "habit-rate habit-item", style: habitStyle(hb) },
+      habitTotal[1] > 0 && barChart({
+        data: habitData, color: "var(--accent)", width: W, fmt: (v) => `${fmt0(v)}%`,
+        ariaLabel: `Hábitos cumplidos por ${per}: ${fmt0((habitTotal[0] / habitTotal[1]) * 100)} % en el período`,
+      }),
+      h("ul", { class: "list", style: habitTotal[1] > 0 ? "margin-top:16px" : "" }, habitRates.map(({ hb, done, days, pct }) => h("li", { class: "habit-rate habit-item", style: habitStyle(hb) },
         h("div", { class: "habit-rate-top" },
           h("span", { class: "habit-dot", "aria-hidden": "true" }),
           h("span", { class: "habit-name" }, hb.name),
-          h("span", { class: "num muted" }, has ? `${done} de ${days} días · ` : "sin marcas · "),
+          h("span", { class: "num muted" }, days ? `${done} de ${days} días · ` : "todavía sin días · "),
           h("b", { class: "num" }, `${pct} %`)),
         h("div", { class: "habit-bar", role: "img", "aria-label": `${hb.name}: ${pct} %` }, h("i", { style: `width:${pct}%` })))))),
 
@@ -2240,7 +2304,8 @@ function viewSummary() {
         h("table", { class: "table" },
           h("thead", {}, h("tr", {},
             h("th", { scope: "col" }, "Mes"), h("th", { scope: "col", class: "n" }, "Km"), h("th", { scope: "col", class: "n" }, "Carreras"),
-            h("th", { scope: "col", class: "n" }, "Kcal/día"), h("th", { scope: "col", class: "n" }, "Cafeína/día"), h("th", { scope: "col", class: "n" }, "Sueño"), h("th", { scope: "col", class: "n" }, "Peso"))),
+            h("th", { scope: "col", class: "n" }, "Kcal/día"), h("th", { scope: "col", class: "n" }, "Cafeína/día"), h("th", { scope: "col", class: "n" }, "Sueño"), h("th", { scope: "col", class: "n" }, "Peso"),
+            db.habits.length > 0 && h("th", { scope: "col", class: "n" }, "Hábitos"))),
           h("tbody", {}, months.map((m) => {
             const r = mRuns.get(m.key) || [], ml = mMeals.get(m.key) || [], sl = mSleep.get(m.key) || [], bd = mBody.get(m.key) || [];
             return h("tr", {},
@@ -2250,7 +2315,11 @@ function viewSummary() {
               h("td", { class: "n" }, ml.length ? fmt0(kcalPerDay(ml)) : "—"),
               h("td", { class: "n" }, (() => { const cf = mCaf.get(m.key) || []; const dd = new Set(cf.map((x) => x.date)).size; return dd ? `${fmt0(sum(cf, "mg") / dd)} mg` : "—"; })()),
               h("td", { class: "n" }, sl.length ? `${fmt1(avgOf(sl, "hours"))} h` : "—"),
-              h("td", { class: "n" }, bd.length ? `${fmt1(bd.at(-1).weight)} kg` : "—"));
+              h("td", { class: "n" }, bd.length ? `${fmt1(bd.at(-1).weight)} kg` : "—"),
+              db.habits.length > 0 && h("td", { class: "n" }, (() => {
+                const from = m.key + "-01", end = addDays(iso(new Date(parseDate(from).getFullYear(), parseDate(from).getMonth() + 1, 1)), -1);
+                const v = habitPctRange(from, end > tISO ? tISO : end); return v == null ? "—" : `${fmt0(v)} %`;
+              })()));
           }))))),
   ];
 }

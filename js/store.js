@@ -65,6 +65,9 @@ export function uid() {
   return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}`;
 }
 
+// cómo se cumple un hábito: a mano o solo, al llegar a un objetivo diario
+export const HABIT_KINDS = ["manual", "run", "walk", "ride", "sleep", "protein"];
+
 const clean = {
   runs: (r) => isDate(r?.date) && {
     id: id(r.id), date: r.date,
@@ -103,6 +106,8 @@ const clean = {
   },
   habits: (x) => x && str(x.name, 60).trim() && {
     id: id(x.id), name: str(x.name, 60).trim(), color: str(x.color, 20) || "rosa", position: Math.round(num(x.position, 0, 1000)),
+    ...(HABIT_KINDS.includes(x.kind) && x.kind !== "manual" && num(x.target, 0, 10000) > 0
+      ? { kind: x.kind, target: num(x.target, 0, 10000) } : { kind: "manual", target: null }),
   },
   habitLogs: (x) => isDate(x?.date) && typeof x.habitId === "string" && x.habitId && {
     id: id(x.id), habitId: str(x.habitId, 40), date: x.date,
@@ -156,7 +161,7 @@ const fromRow = {
   sleep: (s) => s,
   body: (b) => ({ ...b, weight: b.weight_kg, fat: b.body_fat_pct }),
   caffeine: (x) => ({ ...x, yerbaG: x.yerba_g, desc: x.description, mg: x.caffeine_mg, recipeId: x.recipe_id || "" }),
-  habits: (x) => x,
+  habits: (x) => ({ ...x, target: x.target == null ? null : Number(x.target) }),
   habitLogs: (x) => ({ ...x, habitId: x.habit_id }),
   plan: (x) => ({ ...x, recipeId: x.recipe_id }),
   shopping: (x) => ({ ...x, weekStart: x.week_start }),
@@ -177,7 +182,7 @@ const toRow = {
   sleep: (s) => ({ id: s.id, date: s.date, bed: s.bed, wake: s.wake, hours: s.hours, quality: s.quality, notes: s.notes }),
   body: (b) => ({ id: b.id, date: b.date, weight_kg: b.weight, body_fat_pct: b.fat, notes: b.notes }),
   caffeine: (x) => ({ id: x.id, date: x.date, time: x.time, kind: x.kind, amount: x.amount, yerba: x.yerba, yerba_g: x.yerbaG, description: x.desc, caffeine_mg: x.mg, recipe_id: x.recipeId || null }),
-  habits: (x) => ({ id: x.id, name: x.name, color: x.color, position: x.position }),
+  habits: (x) => ({ id: x.id, name: x.name, color: x.color, position: x.position, kind: x.kind, target: x.target }),
   habitLogs: (x) => ({ id: x.id, habit_id: x.habitId, date: x.date }),
   plan: (x) => ({ id: x.id, date: x.date, slot: x.slot, recipe_id: x.recipeId, servings: x.servings }),
   shopping: (x) => ({ id: x.id, week_start: x.weekStart, sections: x.sections, updated_at: new Date().toISOString() }),

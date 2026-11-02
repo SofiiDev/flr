@@ -18,7 +18,7 @@ const COLUMNS = {
   body_metrics: ["id", "date", "weight_kg", "body_fat_pct", "notes"],
   recipes: ["id", "name", "servings", "ingredients", "kcal", "p", "c", "f", "items", "caffeine_mg", "created_by", "updated_at"],
   caffeine: ["id", "date", "time", "kind", "amount", "yerba", "yerba_g", "description", "caffeine_mg", "recipe_id"],
-  habits: ["id", "name", "color", "position"],
+  habits: ["id", "name", "color", "position", "kind", "target"],
   habit_logs: ["id", "habit_id", "date"],
   meal_plan: ["id", "date", "slot", "recipe_id", "servings"],
   shopping_lists: ["id", "week_start", "sections", "updated_at"],

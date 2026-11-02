@@ -851,3 +851,4 @@ main.slide-from-left > :not(.fab) { animation: slide-from-left .24s ease-out; }
 .habit-rate-top .muted { font-size: var(--fs-sm); }
 .habit-bar { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
 .habit-bar i { display: block; height: 100%; border-radius: 4px; background: var(--c); }
+.habit-goal { font-size: var(--fs-xs); color: var(--text-2); margin-top: -2px; }

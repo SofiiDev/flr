@@ -154,8 +154,12 @@ create table if not exists public.habits (
   name       text not null check (length(name) between 1 and 60),
   color      text not null default 'rosa',
   position   integer not null default 0,
+  kind       text not null default 'manual' check (kind in ('manual', 'run', 'walk', 'ride', 'sleep', 'protein')),
+  target     numeric(7,2),   -- objetivo diario de los hábitos automáticos (km, horas o gramos)
   created_at timestamptz not null default now()
 );
+alter table public.habits add column if not exists kind text not null default 'manual' check (kind in ('manual', 'run', 'walk', 'ride', 'sleep', 'protein'));
+alter table public.habits add column if not exists target numeric(7,2);
 create table if not exists public.habit_logs (
   id         uuid primary key default gen_random_uuid(),
   profile_id text not null references public.profiles (id) on delete cascade,
