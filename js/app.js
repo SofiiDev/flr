@@ -6,7 +6,7 @@ import { db, account, session, setSession, api, SessionExpired, CAFFEINE_KINDS, 
 import { barChart, lineChart } from "./charts.js";
 
 // cambiala en cada actualización: se ve en Ajustes para saber si el celular ya tiene la última
-const APP_VERSION = "2026.11.02-4";
+const APP_VERSION = "2026.11.02-5";
 
 /* ============ utilidades ============ */
 
@@ -1840,17 +1840,22 @@ function viewRuns() {
   const kmByDay = days.map((d) => sum(list.filter((r) => r.date === d), "km"));
   const longest = list.reduce((a, r) => Math.max(a, r.km), 0);
   const weekOf = (sp) => sum(all.filter((r) => r.date >= ws && (r.sport || "run") === sp), "km");
+  const d7 = days[0];   // mismos 7 días que el gráfico de abajo
+  const last7Of = (sp) => sum(all.filter((r) => r.date >= d7 && (r.sport || "run") === sp), "km");
   const monthOf = (sp) => sum(all.filter((r) => r.date >= ms && (r.sport || "run") === sp), "km");
   const totalOf = (sp) => sum(all.filter((r) => (r.sport || "run") === sp), "km");
   const avg = monthTimed.length ? [sum(monthTimed, "sec"), sum(monthTimed, "km")] : null;
 
   const stats = filter === "all"
     // cada deporte: km de la semana, y debajo el mes y el total histórico
-    ? [stat(fmt1(weekOf("run")), "km", "Corriendo esta semana", `Mes ${fmt1(monthOf("run"))} km · objetivo ${fmt0(g.km)}/sem`),
-       stat(fmt1(weekOf("walk")), "km", "Caminando esta semana", `Mes ${fmt1(monthOf("walk"))} km · total ${fmt0(totalOf("walk"))} km`),
-       stat(fmt1(weekOf("ride")), "km", "En bici esta semana", `Mes ${fmt1(monthOf("ride"))} km · total ${fmt0(totalOf("ride"))} km`),
-       stat(fmt1(sum(all.filter((r) => r.date >= ms), "km")), "km", "Este mes, en total", `Total histórico ${fmt0(sum(all, "km"))} km`)]
-    : [stat(fmt1(sum(week, "km")), "km", "Esta semana", filter === "run" ? `Objetivo ${fmt0(g.km)} km` : null),
+    // los mismos 7 días que el gráfico; debajo, la semana (lunes a hoy), el mes y el total
+    ? [stat(fmt1(last7Of("run")), "km", "Corriendo · 7 días", `Semana ${fmt1(weekOf("run"))} de ${fmt0(g.km)} km · mes ${fmt1(monthOf("run"))}`),
+       stat(fmt1(last7Of("walk")), "km", "Caminando · 7 días", `Semana ${fmt1(weekOf("walk"))} · mes ${fmt1(monthOf("walk"))} · total ${fmt0(totalOf("walk"))} km`),
+       stat(fmt1(last7Of("ride")), "km", "En bici · 7 días", `Semana ${fmt1(weekOf("ride"))} · mes ${fmt1(monthOf("ride"))} · total ${fmt0(totalOf("ride"))} km`),
+       stat(fmt1(sum(all.filter((r) => r.date >= d7), "km")), "km", "Todo · 7 días", `Mes ${fmt1(sum(all.filter((r) => r.date >= ms), "km"))} · total ${fmt0(sum(all, "km"))} km`)]
+    : [filter === "run"
+         ? stat(fmt1(sum(week, "km")), "km", "Esta semana", `Objetivo ${fmt0(g.km)} km · desde el lunes`)
+         : stat(fmt1(last7Of(filter)), "km", "Últimos 7 días", `Esta semana ${fmt1(sum(week, "km"))} km`),
        stat(fmt1(sum(month, "km")), "km", "Este mes"),
        filter === "ride"
          ? stat(avg ? fmt1(avg[1] / (avg[0] / 3600)) : "—", "km/h", "Velocidad media mes")
