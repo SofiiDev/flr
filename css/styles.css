@@ -39,6 +39,8 @@
   --chart-fat: #00917E;
   --chart-sleep: #6D4AD8;
   --chart-caffeine: #5E8C2F;
+  --walk: #0369A1;
+  --ride: #A16207;
   --mate: #5E8C2F;
   --mate-foam: #C9DC8F;
   --steel: #2E3A33;
@@ -106,6 +108,8 @@
   --chart-fat: #13A08E;
   --chart-sleep: #8A6AE8;
   --chart-caffeine: #6FA33A;
+  --walk: #38BDF8;
+  --ride: #FACC15;
   --mate: #6FA33A;
   --mate-foam: #B9D27E;
   --steel: #3A4A40;
@@ -150,6 +154,8 @@
     --chart-fat: #13A08E;
     --chart-sleep: #8A6AE8;
   --chart-caffeine: #6FA33A;
+  --walk: #38BDF8;
+  --ride: #FACC15;
   --mate: #6FA33A;
   --mate-foam: #B9D27E;
   --steel: #3A4A40;
@@ -754,3 +760,11 @@ main.slide-from-right > :not(.fab) { animation: slide-from-right .24s ease-out; 
 main.slide-from-left > :not(.fab) { animation: slide-from-left .24s ease-out; }
 @keyframes slide-from-right { from { transform: translateX(28px); opacity: .4; } to { transform: none; opacity: 1; } }
 @keyframes slide-from-left { from { transform: translateX(-28px); opacity: .4; } to { transform: none; opacity: 1; } }
+
+/* ---------- deportes ---------- */
+.sport-filter { margin-bottom: var(--s3); }
+.badge.sport-run { background: color-mix(in srgb, var(--run) 14%, transparent); color: var(--run); }
+.badge.sport-walk { background: color-mix(in srgb, var(--walk) 14%, transparent); color: var(--walk); }
+.badge.sport-ride { background: color-mix(in srgb, var(--ride) 16%, transparent); color: var(--ride); }
+.week-bar.walk { background: var(--walk); }
+.week-bar.ride { background: var(--ride); }

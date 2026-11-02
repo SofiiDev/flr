@@ -71,6 +71,7 @@ const clean = {
     km: num(r.km, 0, 1000), sec: Math.round(num(r.sec, 0, 360000)),
     type: str(r.type, 20) || "suave", notes: str(r.notes, 500),
     source: r.source === "strava" ? "strava" : "manual",
+    sport: ["walk", "ride"].includes(r.sport) ? r.sport : "run",
     elevation: r.elevation == null ? null : num(r.elevation, 0, 20000),
     avgHr: r.avgHr == null ? null : num(r.avgHr, 0, 250),
   },
@@ -154,7 +155,7 @@ const fromRow = {
 };
 
 const toRow = {
-  runs: (r) => ({ id: r.id, date: r.date, km: r.km, sec: r.sec, type: r.type, notes: r.notes }),
+  runs: (r) => ({ id: r.id, date: r.date, km: r.km, sec: r.sec, type: r.type, notes: r.notes, sport: r.sport }),
   meals: (m) => ({
     id: m.id, date: m.date, time: m.time, slot: m.slot, name: m.name,
     kcal: m.kcal, p: m.p, c: m.c, f: m.f,

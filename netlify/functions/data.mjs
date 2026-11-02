@@ -12,7 +12,7 @@ import { json, sameOrigin, sessionProfile, supabaseAdmin, explainDbError, isProf
 
 // columnas que el navegador puede escribir en cada tabla
 const COLUMNS = {
-  runs: ["id", "date", "km", "sec", "type", "notes"],
+  runs: ["id", "date", "km", "sec", "type", "notes", "sport"],
   meals: ["id", "date", "time", "slot", "name", "kcal", "p", "c", "f", "recipe_id", "servings", "items", "description"],
   sleep: ["id", "date", "bed", "wake", "hours", "quality", "notes"],
   body_metrics: ["id", "date", "weight_kg", "body_fat_pct", "notes"],

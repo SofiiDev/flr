@@ -12,6 +12,8 @@ const ICON = {
   today: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   runs: '<circle cx="13.5" cy="4.5" r="1.8"/><path d="M7 21l3.5-6 3 2.5V22M6.5 11.5 9 8l4 1 2.5 3.5H19M13 9l-2.5 6"/>',
   meals: '<path d="M7 3v8a2 2 0 0 0 2 2v8M11 3v8M5 3v8M17 21V3c-2 1.5-3 4-3 7v4h3"/>',
+  walk: '<circle cx="13" cy="4.5" r="1.8"/><path d="M10 21l2-6 2.5 2V21M9 12l1.5-4.5L14 8l1.5 3.5 2.5 1M10.5 7.5 8 12"/>',
+  bike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l3.5-7h5L18 16M9.5 9 12 16h-6M14 6h2.5l-1.5 3"/>',
   mate: '<path d="M6 9h12l-1.2 9.5a3 3 0 0 1-3 2.5h-3.6a3 3 0 0 1-3-2.5L6 9Z"/><path d="M14 9 17.5 3"/><path d="M8.5 9c.5-2 2-3 3.5-3"/>',
   recipes: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/>',
   sleep: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>',
@@ -315,9 +317,14 @@ const checked = (form, name) => form.querySelector(`input[name="${name}"]:checke
 /* ============ formularios ============ */
 
 const RUN_TYPES = [["suave", "Suave"], ["tempo", "Tempo"], ["series", "Series"], ["largo", "Largo"], ["carrera", "Carrera"]];
+// deporte → [nombre en el filtro, nombre de una actividad, ícono]
+const SPORT_INFO = { run: ["Correr", "Carrera", "runs"], walk: ["Caminata", "Caminata", "walk"], ride: ["Bici", "Salida en bici", "bike"] };
+const SPORTS = Object.keys(SPORT_INFO);
+const isRun = (r) => (r.sport || "run") === "run";
+const fmtSpeed = (sec, km) => (km > 0 && sec > 0 ? `${fmt1(km / (sec / 3600))} km/h` : "—");
 
-function runForm(rec) {
-  const r = rec || { date: todayISO(), km: "", sec: 0, type: "suave", notes: "" };
+function runForm(rec, preset = {}) {
+  const r = rec || { date: todayISO(), km: "", sec: 0, type: "suave", notes: "", sport: preset.sport || "run" };
   const date = h("input", { type: "date", name: "date", value: r.date, max: todayISO(), required: true });
   const km = numInput("km", r.km, { placeholder: "5,0" });
   const hh = numInput("hh", r.sec ? Math.floor(r.sec / 3600) : "", { int: true, label: "Horas" });
@@ -326,35 +333,46 @@ function runForm(rec) {
   const notes = h("textarea", { name: "notes", rows: 2, placeholder: "Sensaciones, ruta, zapatillas…" });
   notes.value = r.notes || "";
 
+  const liveLabel = h("span", {}, "Ritmo medio ");
   const pace = h("b", { class: "num" }, "—");
   const speed = h("span", { class: "num" }, "");
+  const typeField = h("div", { class: "field" }, h("span", { class: "label" }, "Tipo"), segmented("type", RUN_TYPES, r.type, "Tipo de carrera"));
   const secs = () => readNum(hh) * 3600 + readNum(mm) * 60 + readNum(ss);
+  const sportNow = () => form.querySelector('input[name="sport"]:checked')?.value || "run";
   const update = () => {
-    const d = readNum(km), s = secs();
-    pace.textContent = fmtPace(s, d);
-    speed.textContent = d && s ? `${fmt1(d / (s / 3600))} km/h` : "";
+    const d = readNum(km), s = secs(), sp = sportNow();
+    // en bici importa la velocidad; corriendo y caminando, el ritmo por km
+    liveLabel.textContent = sp === "ride" ? "Velocidad media " : "Ritmo medio ";
+    pace.textContent = sp === "ride" ? fmtSpeed(s, d) : fmtPace(s, d);
+    speed.textContent = sp === "ride" ? (d && s ? fmtPace(s, d) : "") : d && s ? fmtSpeed(s, d) : "";
+    typeField.hidden = sp !== "run";
+    notes.placeholder = sp === "ride" ? "Recorrido, bici, viento…" : sp === "walk" ? "Recorrido, con quién, terreno…" : "Sensaciones, ruta, zapatillas…";
   };
   [km, hh, mm, ss].forEach((i) => i.addEventListener("input", update));
-  update();
 
   const form = sheetForm((f) => {
     const d = readNum(km), s = secs();
     km.setAttribute("aria-invalid", d > 0 ? "false" : "true");
     if (!d) { km.focus(); toast("Indicá los kilómetros"); return; }
-    upsert("runs", { id: r.id || uid(), date: date.value || todayISO(), km: d, sec: s, type: checked(f, "type"), notes: notes.value.trim() });
-    closeSheet(); toast(rec ? "Carrera actualizada" : "Carrera guardada"); render();
+    const sp = checked(f, "sport");
+    upsert("runs", { id: r.id || uid(), date: date.value || todayISO(), km: d, sec: s, type: sp === "run" ? checked(f, "type") : "suave", notes: notes.value.trim(), sport: sp });
+    closeSheet(); toast(`${SPORT_INFO[sp][1]} ${rec ? "actualizada" : "guardada"}`); render();
   },
+    h("div", { class: "field" }, h("span", { class: "label" }, "Deporte"),
+      segmented("sport", SPORTS.map((k) => [k, SPORT_INFO[k][0]]), r.sport || "run", "Deporte")),
     field("Fecha", date),
     field("Distancia (km)", km),
     h("div", { class: "field" },
       h("span", { class: "label" }, "Tiempo (h : min : s)"),
       h("div", { class: "row" }, hh, mm, ss)),
-    h("div", { class: "live", "aria-live": "polite" }, h("span", {}, "Ritmo medio ", pace), speed),
-    h("div", { class: "field" }, h("span", { class: "label" }, "Tipo"), segmented("type", RUN_TYPES, r.type, "Tipo de carrera")),
+    h("div", { class: "live", "aria-live": "polite" }, h("span", {}, liveLabel, pace), speed),
+    typeField,
     field("Notas", notes),
-    formActions(rec && (() => { remove("runs", r.id); closeSheet(); toast("Carrera eliminada"); render(); })),
+    formActions(rec && (() => { remove("runs", r.id); closeSheet(); toast("Actividad eliminada"); render(); })),
   );
-  openSheet(rec ? "Editar carrera" : "Nueva carrera", form);
+  form.addEventListener("change", update);
+  update();
+  openSheet(rec ? "Editar actividad" : "Nueva actividad", form);
 }
 
 const SLOTS = [["desayuno", "Desayuno"], ["comida", "Almuerzo"], ["merienda", "Merienda"], ["cena", "Cena"], ["snack", "Snack"]];
@@ -624,12 +642,12 @@ const GUIDE = [
     "En el celular, abrí Garmin Connect → Ajustes → Aplicaciones conectadas → Strava, y conectalo. Desde ahí cada actividad del reloj llega sola a Strava.",
     "En esta app: Ajustes → «Conectar con Strava» → «Autorizar».",
     "Al volver vas a ver «Strava conectado» y se importan tus carreras.",
-    "Desde entonces, las carreras nuevas entran solas al abrir la app (cada 3 horas) o al tocar «Sincronizar» en Ajustes.",
-  ], "Solo se importan carreras (también trail y cinta), no bici ni otros deportes. Lo que edites en una carrera importada no se pisa al sincronizar."],
-  ["Registrar una carrera a mano", [
-    "Andá a la pestaña Correr y tocá «+ Carrera».",
+    "Desde entonces, las actividades nuevas entran solas al abrir la app (cada 3 horas) o al tocar «Sincronizar» en Ajustes. «Traer todo» revisa tu historial completo.",
+  ], "Se importan carreras (también trail y cinta), caminatas (y trekking) y salidas en bici. Lo que edites en una actividad importada no se pisa al sincronizar."],
+  ["Registrar una carrera (o una caminata o bici) a mano", [
+    "Andá a la pestaña Correr y tocá «+ Carrera». Para sumar otro ejercicio, elegí arriba «Caminata» o «Bici» (o cambiá el deporte en el formulario).",
     "Escribí los kilómetros (podés usar coma: 5,2) y el tiempo en horas, minutos y segundos. El ritmo por km se calcula solo.",
-    "Elegí el tipo (suave, tempo, series, largo o carrera), agregá notas si querés y tocá «Guardar».",
+    "Si es una carrera, elegí el tipo (suave, tempo, series, largo o carrera). Agregá notas si querés y tocá «Guardar». En bici se muestra la velocidad en km/h.",
     "Para cambiarla, tocala en el historial. Para borrarla, tocá «Eliminar» dos veces.",
   ]],
   ["Registrar lo que comés", [
@@ -698,7 +716,7 @@ const TOUR = [
   { title: "¡Bienvenida a FlorLovesRunning!", text: "Te muestro la app en un minuto. Podés saltear el tour cuando quieras y repetirlo desde Ajustes." },
   { view: "today", target: ".rings", title: "Tu día de un vistazo", text: "Calorías que te quedan, kilómetros de la semana frente a tu objetivo y horas de sueño." },
   { view: "today", target: ".quick", title: "Registrar rápido", text: "Desde acá anotás una carrera, una comida, tu peso o tu sueño en dos toques." },
-  { view: "runs", target: ".fab", title: "Correr", text: "Tocá «+ Carrera» para cargar una a mano: el ritmo por km se calcula solo. Las de tu Garmin llegan solas vía Strava." },
+  { view: "runs", target: ".fab", title: "Correr", text: "Tocá «+ Carrera» para cargar una a mano: el ritmo por km se calcula solo. Arriba podés pasar a Caminata o Bici para sumar otros ejercicios. Lo de tu Garmin llega solo vía Strava." },
   { view: "meals", target: ".fab", title: "Comidas", text: "Tocá «+ Comida», describí lo que comiste y tocá «Calcular macros con IA». También podés elegir una receta o escribir los macros. Para corregir una comida o cambiarla de momento, tocala." },
   { view: "meals", target: ".subnav", title: "Semana y recetas", text: "En «Semana» repartís tus recetas en los días y armás la lista de compras con IA. En «Recetas» guardás tus platos con sus ingredientes; las ven las dos. Tip: deslizá hacia los costados para cambiar de pestaña." },
   { view: "body", target: ".fab", title: "Peso, IMC y grasa", text: "Tocá «+ Peso» para anotar tu peso y, si la tenés, tu grasa corporal. El IMC se calcula con tu altura." },
@@ -815,10 +833,11 @@ function settingsSheet() {
         h("strong", {}, linked ? "Strava conectado" : "Strava"),
         h("p", { class: "muted" }, linked
           ? (prof.strava_synced_at ? `Última sincronización: ${new Date(prof.strava_synced_at).toLocaleString("es", { dateStyle: "medium", timeStyle: "short" })}` : "Aún sin sincronizar")
-          : "Conectalo para que las carreras de tu Garmin lleguen solas a la app."))),
+          : "Conectalo para que tus carreras, caminatas y salidas en bici del Garmin lleguen solas a la app."))),
     linked
       ? h("div", { class: "actions" },
           h("button", { type: "button", class: "btn ghost", onclick: (e) => syncStrava({ button: e.currentTarget }) }, "Sincronizar"),
+          h("button", { type: "button", class: "btn ghost", onclick: (e) => syncStrava({ button: e.currentTarget, full: true }) }, "Traer todo"),
           confirmButton("Desconectar", "¿Seguro? Tocá de nuevo", disconnectStrava, "btn danger"))
       : h("button", { type: "button", class: "btn strava-btn block", icon: "strava", onclick: connectStrava }, "Conectar con Strava"),
   );
@@ -845,7 +864,7 @@ function settingsSheet() {
     h("h3", { class: "section-title" }, "Objetivos diarios"),
     field("Calorías (kcal)", inputs.kcal),
     h("div", { class: "row" }, field("Proteína (g)", inputs.p), field("Carbos (g)", inputs.c), field("Grasas (g)", inputs.f)),
-    h("div", { class: "row" }, field("Sueño (h/noche)", inputs.sleep), field("Km por semana", inputs.km)),
+    h("div", { class: "row" }, field("Sueño (h/noche)", inputs.sleep), field("Km corriendo por semana", inputs.km)),
     h("div", { class: "row" }, field("Peso objetivo (kg)", inputs.weight), field("Altura (cm)", height)),
     field("Cafeína máxima (mg por día)", inputs.caffeine, "La referencia habitual para adultos sanos es 400 mg; en el embarazo, 200 mg. Consultá con tu médica si tenés dudas."),
     h("button", { type: "submit", class: "btn primary block" }, "Guardar objetivos"),
@@ -922,22 +941,22 @@ async function disconnectStrava() {
 }
 
 let syncing = false;
-async function syncStrava({ button, silent } = {}) {
+async function syncStrava({ button, silent, full } = {}) {
   if (syncing) return;
   syncing = true;
   if (button) { button.disabled = true; button.textContent = "Sincronizando…"; }
   try {
-    const { added } = await api("/api/strava/sync");
+    const { added } = await api("/api/strava/sync", full ? { full: true } : {});
     await flush();
     await loadAll();
     if (button) closeSheet();
-    if (added || !silent) toast(added ? `${added} ${added === 1 ? "carrera nueva" : "carreras nuevas"} de Strava` : "Todo al día con Strava");
+    if (added || !silent) toast(added ? `${added} ${added === 1 ? "actividad nueva" : "actividades nuevas"} de Strava` : "Todo al día con Strava");
     render();
   } catch (err) {
     if (!silent) toast(err.message);
   } finally {
     syncing = false;
-    if (button) { button.disabled = false; button.textContent = "Sincronizar"; }
+    if (button) { button.disabled = false; button.textContent = full ? "Traer todo" : "Sincronizar"; }
   }
 }
 
@@ -1408,18 +1427,19 @@ function stat(value, unit, label, note) {
 const fab = (label, onclick) => h("button", { type: "button", class: "btn primary fab", icon: "plus", onclick }, label);
 
 function runItem(r) {
+  const sp = r.sport || "run";
   return h("li", { class: "item" },
     h("button", { type: "button", class: "item-btn", onclick: () => runForm(r) },
-      h("span", { class: "badge run", icon: "runs" }),
+      h("span", { class: `badge sport-${sp}`, icon: SPORT_INFO[sp][2] }),
       h("span", { class: "item-main" },
-        h("span", { class: "item-title" }, `${fmt1(r.km)} km · ${capitalize(r.type)}`),
+        h("span", { class: "item-title" }, `${fmt1(r.km)} km · ${sp === "run" ? capitalize(r.type) : SPORT_INFO[sp][1]}`),
         h("span", { class: "item-sub", style: "display:block" },
           r.source === "strava" && h("span", { class: "tag" }, "Strava"),
           dayLabel(r.date),
           r.elevation ? ` · ↗ ${fmt0(r.elevation)} m` : "",
           r.avgHr ? ` · ♥ ${fmt0(r.avgHr)}` : "",
           r.notes && ` · ${r.notes}`)),
-      h("span", { class: "item-end num" }, r.sec ? fmtDur(r.sec) : "—", h("small", {}, fmtPace(r.sec, r.km)))));
+      h("span", { class: "item-end num" }, r.sec ? fmtDur(r.sec) : "—", h("small", {}, sp === "ride" ? fmtSpeed(r.sec, r.km) : fmtPace(r.sec, r.km)))));
 }
 
 function mealItem(m) {
@@ -1471,7 +1491,7 @@ function sleepItem(s) {
 
 /* ============ vistas ============ */
 
-const state = { view: "today", mealDate: todayISO(), planWeek: weekStart(todayISO()), period: "3m", recipeFilter: "all" };
+const state = { view: "today", mealDate: todayISO(), planWeek: weekStart(todayISO()), period: "3m", recipeFilter: "all", sportFilter: "run" };
 
 const VIEWS = {
   today: { title: "Hoy", tab: "today", render: viewToday },
@@ -1488,7 +1508,7 @@ function viewToday() {
   const t = todayISO(), g = db.goals;
   const meals = db.meals.filter((m) => m.date === t).sort(byDateDesc);
   const ws = weekStart(t);
-  const weekRuns = db.runs.filter((r) => r.date >= ws && r.date <= t);
+  const weekRuns = db.runs.filter((r) => r.date >= ws && r.date <= t && isRun(r));
   const weekKm = sum(weekRuns, "km");
   const lastSleep = [...db.sleep].sort(byDateDesc)[0];
   const sleep7 = db.sleep.filter((s) => s.date > addDays(t, -7));
@@ -1510,7 +1530,7 @@ function viewToday() {
           h("div", {}, h("b", {}, "Calorías"), h("span", {}, `${fmt0(kcal)} / ${fmt0(g.kcal)}`))),
         h("div", { class: "ring-item" },
           ring(weekKm, g.km, fmt1(weekKm), "km", { color: "run", size: "sm" }),
-          h("div", {}, h("b", {}, "Semana"), h("span", {}, `de ${fmt0(g.km)} km`))),
+          h("div", {}, h("b", {}, "Corriendo"), h("span", {}, `de ${fmt0(g.km)} km esta semana`))),
         h("div", { class: "ring-item" },
           ring(lastSleep?.hours || 0, g.sleep, lastSleep ? fmt1(lastSleep.hours) : "—", "horas", { color: "sleep", size: "sm" }),
           h("div", {}, h("b", {}, "Sueño"), h("span", {}, avgSleep ? `media ${fmt1(avgSleep)} h` : "sin registros"))))),
@@ -1549,31 +1569,47 @@ function viewToday() {
 
 function viewRuns() {
   const t = todayISO(), g = db.goals;
-  const runs = [...db.runs].sort(byDateDesc);
+  const filter = state.sportFilter;
+  const all = [...db.runs].sort(byDateDesc);
+  const list = filter === "all" ? all : all.filter((r) => (r.sport || "run") === filter);
   const ws = weekStart(t), ms = t.slice(0, 8) + "01";
-  const week = runs.filter((r) => r.date >= ws);
-  const month = runs.filter((r) => r.date >= ms);
+  const week = list.filter((r) => r.date >= ws), month = list.filter((r) => r.date >= ms);
   const monthTimed = month.filter((r) => r.sec && r.km);
   const days = last7();
-  const kmByDay = days.map((d) => sum(runs.filter((r) => r.date === d), "km"));
-  const longest = runs.reduce((a, r) => Math.max(a, r.km), 0);
+  const kmByDay = days.map((d) => sum(list.filter((r) => r.date === d), "km"));
+  const longest = list.reduce((a, r) => Math.max(a, r.km), 0);
+  const weekOf = (sp) => sum(all.filter((r) => r.date >= ws && (r.sport || "run") === sp), "km");
+  const avg = monthTimed.length ? [sum(monthTimed, "sec"), sum(monthTimed, "km")] : null;
 
+  const stats = filter === "all"
+    ? [stat(fmt1(weekOf("run")), "km", "Corriendo esta semana", `Objetivo ${fmt0(g.km)} km`),
+       stat(fmt1(weekOf("walk")), "km", "Caminando esta semana"),
+       stat(fmt1(weekOf("ride")), "km", "En bici esta semana"),
+       stat(fmt1(sum(all.filter((r) => r.date >= ms), "km")), "km", "Este mes, en total")]
+    : [stat(fmt1(sum(week, "km")), "km", "Esta semana", filter === "run" ? `Objetivo ${fmt0(g.km)} km` : null),
+       stat(fmt1(sum(month, "km")), "km", "Este mes"),
+       filter === "ride"
+         ? stat(avg ? fmt1(avg[1] / (avg[0] / 3600)) : "—", "km/h", "Velocidad media mes")
+         : stat(avg ? fmtDur(avg[0] / avg[1]) : "—", "/km", "Ritmo medio mes"),
+       stat(fmt1(longest), "km", filter === "run" ? "Más larga" : "La más larga")];
+
+  // correr es la base; caminata y bici son ejercicios extra; «Todo» los junta
+  const options = [...SPORTS.map((k) => [k, SPORT_INFO[k][0]]), ["all", "Todo"]];
   return [
-    h("section", { class: "card", "aria-label": "Resumen de carreras" },
-      h("div", { class: "stats" },
-        stat(fmt1(sum(week, "km")), "km", "Esta semana", `Objetivo ${fmt0(g.km)} km`),
-        stat(fmt1(sum(month, "km")), "km", "Este mes"),
-        stat(monthTimed.length ? fmtDur(sum(monthTimed, "sec") / sum(monthTimed, "km")) : "—", "/km", "Ritmo medio mes"),
-        stat(fmt1(longest), "km", "Más larga"))),
+    h("div", { class: "seg sport-filter", role: "radiogroup", "aria-label": "Deporte" },
+      options.map(([k, label]) => h("label", {},
+        h("input", { type: "radio", name: "sportFilter", value: k, checked: k === filter, onchange: () => { state.sportFilter = k; render(); } }),
+        h("span", {}, label)))),
+    h("section", { class: "card", "aria-label": "Resumen de actividad" }, h("div", { class: "stats" }, stats)),
     h("section", { class: "card", "aria-label": "Últimos 7 días" },
       h("div", { class: "card-head" }, h("h2", {}, "Últimos 7 días"), h("span", { class: "muted num" }, `${fmt1(kmByDay.reduce((a, b) => a + b, 0))} km`)),
-      weekChart(days, kmByDay, Math.max(...kmByDay), "", (v) => `${fmt1(v)} km`)),
+      weekChart(days, kmByDay, Math.max(...kmByDay), filter === "walk" || filter === "ride" ? filter : "", (v) => `${fmt1(v)} km`)),
     h("section", { class: "card", "aria-label": "Historial" },
       h("div", { class: "card-head" }, h("h2", {}, "Historial")),
-      runs.length
-        ? h("ul", { class: "list" }, runs.slice(0, 100).map(runItem))
-        : emptyState("runs", "Sin carreras todavía", "Registrá kilómetros y tiempo: calculamos tu ritmo por km.")),
-    fab("Carrera", () => runForm()),
+      list.length
+        ? h("ul", { class: "list" }, list.slice(0, 100).map(runItem))
+        : emptyState(filter === "all" || filter === "run" ? "runs" : SPORT_INFO[filter][2], "Nada registrado todavía", "Registrá kilómetros y tiempo, o conectá Strava para traer tus actividades del Garmin.")),
+    fab(filter === "all" ? "Carrera" : SPORT_INFO[filter][1], () => runForm(null, { sport: filter === "all" ? "run" : filter })),
   ];
 }
 
@@ -1847,7 +1883,7 @@ function viewSummary() {
   const g = db.goals;
   const { start, unit } = periodRange(state.period);
   const inP = (x) => x.date >= start;
-  const runs = db.runs.filter(inP), meals = db.meals.filter(inP), sleep = db.sleep.filter(inP), caf = db.caffeine.filter(inP);
+  const acts = db.runs.filter(inP), runs = acts.filter(isRun), meals = db.meals.filter(inP), sleep = db.sleep.filter(inP), caf = db.caffeine.filter(inP);
   const cafDays = new Set(caf.map((x) => x.date)).size;
   const body = db.body.filter(inP).sort(byDateAsc);
   const timed = runs.filter((r) => r.sec && r.km);
@@ -1875,7 +1911,7 @@ function viewSummary() {
   const domain = [parseDate(start).getTime(), parseDate(todayISO()).getTime()];
 
   // récords de todo el historial
-  const allRuns = db.runs;
+  const allRuns = db.runs.filter(isRun);
   const longest = allRuns.reduce((a, r) => (!a || r.km > a.km ? r : a), null);
   const fastest = allRuns.filter((r) => r.km >= 5 && r.sec).reduce((a, r) => (!a || r.sec / r.km < a.sec / a.km ? r : a), null);
   const bestOf = (u) => [...groupBy(allRuns, u)].map(([k, l]) => [k, sum(l, "km")]).sort((a, b) => b[1] - a[1])[0];
@@ -1883,9 +1919,9 @@ function viewSummary() {
   const monthName = (k) => parseDate(k + "-01").toLocaleDateString("es", { month: "long", year: "numeric" });
 
   const months = bucketList(unit === "month" ? start : start.slice(0, 8) + "01", "month").reverse();
-  const mRuns = groupBy(db.runs, "month"), mMeals = groupBy(db.meals, "month"), mSleep = groupBy(db.sleep, "month"), mBody = groupBy([...db.body].sort(byDateAsc), "month");
+  const mRuns = groupBy(db.runs.filter(isRun), "month"), mMeals = groupBy(db.meals, "month"), mSleep = groupBy(db.sleep, "month"), mBody = groupBy([...db.body].sort(byDateAsc), "month");
 
-  const empty = !runs.length && !meals.length && !sleep.length && !body.length && !caf.length;
+  const empty = !acts.length && !meals.length && !sleep.length && !body.length && !caf.length;
   const cafBy = groupBy(caf, unit);
   const cafData = buckets.map((b) => {
     const list = cafBy.get(b.key) || [];
@@ -1907,8 +1943,10 @@ function viewSummary() {
     h("section", { class: "card", "aria-label": "Totales del período" },
       h("div", { class: "card-head" }, h("h2", {}, "En este período"), h("span", { class: "muted" }, `desde ${shortDate(start)}`)),
       h("div", { class: "stats" },
-        stat(fmt1(sum(runs, "km")), "km", "Distancia", `${runs.length} ${runs.length === 1 ? "carrera" : "carreras"}`),
-        stat(timed.length ? fmtDur(sum(timed, "sec") / sum(timed, "km")) : "—", "/km", "Ritmo medio"),
+        stat(fmt1(sum(runs, "km")), "km", "Corriendo", `${runs.length} ${runs.length === 1 ? "carrera" : "carreras"}`),
+        stat(timed.length ? fmtDur(sum(timed, "sec") / sum(timed, "km")) : "—", "/km", "Ritmo medio corriendo"),
+        acts.some((r) => r.sport === "walk") && stat(fmt1(sum(acts.filter((r) => r.sport === "walk"), "km")), "km", "Caminando", `${acts.filter((r) => r.sport === "walk").length} caminatas`),
+        acts.some((r) => r.sport === "ride") && stat(fmt1(sum(acts.filter((r) => r.sport === "ride"), "km")), "km", "En bici", `${acts.filter((r) => r.sport === "ride").length} salidas`),
         stat(meals.length ? fmt0(kcalPerDay(meals)) : "—", "kcal", "Calorías por día", `Objetivo ${fmt0(g.kcal)}`),
         stat(meals.length ? fmt0(sum(meals, "p") / new Set(meals.map((m) => m.date)).size) : "—", "g", "Proteína por día", `Objetivo ${fmt0(g.p)} g`),
         stat(sleep.length ? fmt1(avgOf(sleep, "hours")) : "—", "h", "Sueño medio", `Objetivo ${fmt1(g.sleep)} h`),
@@ -1919,7 +1957,7 @@ function viewSummary() {
         stat(fatList.length ? fmt1(fatList.at(-1).fat) : "—", "%", "Grasa corporal", fatList.length > 1 ? `${fmtDelta(fatList.at(-1).fat - fatList[0].fat, "pts")} en el período` : null))),
 
     h("section", { class: "card", "aria-label": `Kilómetros por ${per}` },
-      h("div", { class: "card-head" }, h("h2", {}, `Kilómetros por ${per}`)),
+      h("div", { class: "card-head" }, h("h2", {}, `Km corriendo por ${per}`)),
       barChart({
         data: kmData, color: "var(--chart-run)", width: W, fmt: (v) => fmt0(v),
         goal: unit === "week" ? g.km : null, goalLabel: `objetivo ${fmt0(g.km)} km`,

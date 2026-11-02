@@ -60,9 +60,11 @@ create table if not exists public.runs (
   strava_id  bigint unique,
   elevation  numeric(7,1),
   avg_hr     numeric(5,1),
+  sport      text not null default 'run' check (sport in ('run', 'walk', 'ride')),   -- correr, caminar, bici
   created_at timestamptz not null default now()
 );
 create index if not exists runs_profile_date on public.runs (profile_id, date desc);
+alter table public.runs add column if not exists sport text not null default 'run' check (sport in ('run', 'walk', 'ride'));
 
 -- ---------- Recetas (compartidas entre los dos perfiles) ----------
 create table if not exists public.recipes (

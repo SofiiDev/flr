@@ -6,7 +6,8 @@ App móvil privada (PWA instalable) para **Sofi y Flor**: carreras, comidas, rec
 
 ## Qué hace
 
-- **Correr**: km, tiempo y tipo. Ritmo por km, km semanales frente al objetivo, ritmo medio del mes y gráfico de 7 días. Las carreras de Strava llegan solas, con desnivel y pulso medio.
+- **Correr** (la base) **+ caminata y bici**: filtro Correr · Caminata · Bici · Todo; en bici se muestra la velocidad en km/h. El objetivo semanal, el anillo de Hoy y los récords son de correr. Strava trae carreras, caminatas (y trekking) y salidas en bici; «Traer todo» revisa el historial completo.
+- **Detalle de correr**: km, tiempo y tipo. Ritmo por km, km semanales frente al objetivo, ritmo medio del mes y gráfico de 7 días. Las carreras de Strava llegan solas, con desnivel y pulso medio.
 - **Comidas**: macros a mano, desde una receta o estimados por IA a partir de una descripción («2 huevos y una tostada con aguacate»).
 - **Recetas**: ingredientes con cantidades; la IA calcula los macros totales y por porción. **Las recetas son compartidas** entre Sofi y Flor.
 - **Semana**: planificá qué receta comer cada día (momento y porciones), elegí recetas y armá la **lista de compras con IA**, que suma y escala los ingredientes y los ordena por sección del súper; se tacha en el súper y se comparte por WhatsApp. Lo planificado aparece en el diario de cada día para registrarlo con un toque.
