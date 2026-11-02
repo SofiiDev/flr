@@ -21,6 +21,10 @@ const ICON = {
   summary: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  flame: '<path d="M12 3c1 3 4 4.5 4 8.5a4 4 0 0 1-8 0c0-1.6.8-2.8 1.8-3.6.2 1.4 1 2.1 1.7 2.1C11.5 7 10.5 5 12 3Z"/>',
+  up: '<path d="m6 15 6-6 6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
   cart: '<path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>',
   share: '<path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/>',
@@ -713,6 +717,12 @@ const GUIDE = [
     "Tocá «Calcular cafeína con IA» y después «Guardar». También podés escribir los mg a mano.",
     "El termo de la pantalla Hoy se llena con la cafeína del día frente a tu límite; si te pasás, se pone ámbar.",
   ], "El límite lo cambiás en Ajustes → Objetivos. En Resumen ves la cafeína y los termos por día y su evolución."],
+  ["Hábitos", [
+    "En Hoy, en «Hábitos de hoy», tocá «Crear hábito» (o andá a Cuerpo → Hábitos y tocá «+ Hábito»). Elegí un nombre y un color.",
+    "Cada día, tocá el círculo de color en Hoy para marcarlo. Debajo ves tu semana y la racha de días seguidos.",
+    "En Cuerpo → Hábitos elegí un hábito arriba y tachá o destachá cualquier día del mes; con las flechas cambiás de mes.",
+    "Para editar un hábito (nombre o color), borrarlo o cambiar el orden, usá la lista «Tus hábitos» de esa pantalla.",
+  ], "Los hábitos son de cada una: Flor no ve los tuyos."],
   ["Peso, IMC y grasa", [
     "Andá a Cuerpo y tocá «+ Peso».",
     "Escribí tu peso y, si tu balanza la mide, tu grasa corporal (%). La primera vez te pide tu altura para calcular el IMC.",
@@ -749,6 +759,7 @@ function guideSheet() {
 const TOUR = [
   { title: "¡Bienvenida a FlorLovesRunning!", text: "Te muestro la app en un minuto. Podés saltear el tour cuando quieras y repetirlo desde Ajustes." },
   { view: "today", target: ".rings", title: "Tu día de un vistazo", text: "Calorías que te quedan, kilómetros de la semana frente a tu objetivo y horas de sueño." },
+  { view: "today", target: ".habits-card", title: "Hábitos", text: "Creá tus hábitos y tachalos cada día con un toque. Ves tu semana y la racha; el calendario completo está en Cuerpo → Hábitos." },
   { view: "today", target: ".quick", title: "Registrar rápido", text: "Desde acá anotás una carrera, una comida, tu peso o tu sueño en dos toques." },
   { view: "runs", target: ".fab", title: "Correr", text: "Tocá «+ Carrera» para cargar una a mano: el ritmo por km se calcula solo. Arriba podés pasar a Caminata o Bici para sumar otros ejercicios. Lo de tu Garmin llega solo vía Strava." },
   { view: "meals", target: ".fab", title: "Comidas", text: "Tocá «+ Comida», describí lo que comiste y tocá «Calcular macros con IA». También podés elegir una receta o escribir los macros. Para corregir una comida o cambiarla de momento, tocala." },
@@ -1228,6 +1239,160 @@ function caffeineCard(d, { list: showList = false } = {}) {
     h("button", { type: "button", class: "btn ghost block", icon: "plus", style: "margin-top:12px", onclick: () => caffeineForm(null, { date: d }) }, "Mate o café"));
 }
 
+/* ============ hábitos ============ */
+
+// colores de hábito: [nombre, claro, oscuro]
+const HABIT_COLORS = {
+  rosa: ["Rosa", "#CC2D66", "#FF7AA2"],
+  violeta: ["Violeta", "#6D4AD8", "#A78BFA"],
+  azul: ["Azul", "#1F5FD6", "#7AA2FF"],
+  turquesa: ["Turquesa", "#0B7A75", "#3CC9BF"],
+  verde: ["Verde", "#2E7D32", "#6BCB77"],
+  ambar: ["Ámbar", "#B45309", "#F5A524"],
+  grafito: ["Grafito", "#3F3A45", "#D4CFDA"],
+};
+const habitStyle = (hb) => { const [, l, d] = HABIT_COLORS[hb.color] || HABIT_COLORS.rosa; return `--c-l: ${l}; --c-d: ${d}`; };
+const habitsSorted = () => [...db.habits].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name, "es"));
+const habitLog = (hid, d) => db.habitLogs.find((x) => x.habitId === hid && x.date === d);
+const habitDone = (hid, d) => Boolean(habitLog(hid, d));
+
+function toggleHabit(hid, d) {
+  const log = habitLog(hid, d);
+  if (log) remove("habitLogs", log.id);
+  else upsert("habitLogs", { habitId: hid, date: d });
+  render();
+}
+
+/** Días seguidos cumplidos hasta hoy (si hoy todavía no, cuenta hasta ayer). */
+function habitStreak(hid) {
+  let d = todayISO(), n = 0;
+  if (!habitDone(hid, d)) d = addDays(d, -1);
+  while (habitDone(hid, d)) { n++; d = addDays(d, -1); }
+  return n;
+}
+function habitBest(hid) {
+  const dates = db.habitLogs.filter((x) => x.habitId === hid).map((x) => x.date).sort();
+  let best = 0, cur = 0, prev = null;
+  for (const d of dates) { cur = prev && addDays(prev, 1) === d ? cur + 1 : 1; best = Math.max(best, cur); prev = d; }
+  return best;
+}
+
+function habitForm(rec) {
+  const hb = rec || { name: "", color: Object.keys(HABIT_COLORS)[db.habits.length % 7], position: db.habits.length };
+  const name = h("input", { type: "text", name: "name", value: hb.name, maxlength: 60, placeholder: "Ej. Estirar 10 minutos", autocomplete: "off" });
+  const form = sheetForm((f) => {
+    if (!name.value.trim()) { name.focus(); toast("Ponele un nombre al hábito"); return; }
+    upsert("habits", { id: hb.id || uid(), name: name.value.trim(), color: checked(f, "color") || hb.color, position: hb.position });
+    closeSheet(); toast(rec ? "Hábito actualizado" : "Hábito creado"); render();
+  },
+    field("Nombre", name, "Algo concreto que puedas tachar cada día: «sin alcohol», «meditar», «vitaminas»…"),
+    h("div", { class: "field" }, h("span", { class: "label", id: "habitColorLabel" }, "Color"),
+      h("div", { class: "swatches", role: "radiogroup", "aria-labelledby": "habitColorLabel" },
+        Object.entries(HABIT_COLORS).map(([k, [label, l, d]]) => h("label", { class: "swatch", style: `--sw-l: ${l}; --sw-d: ${d}` },
+          h("input", { type: "radio", name: "color", value: k, checked: k === hb.color }),
+          h("span", {}, h("i"), label))))),
+    rec && h("p", { class: "hint", style: "margin:-4px 0 16px" }, `Racha actual: ${habitStreak(hb.id)} · mejor racha: ${habitBest(hb.id)} · ${db.habitLogs.filter((x) => x.habitId === hb.id).length} días cumplidos en total.`),
+    formActions(rec && (() => {
+      db.habitLogs.filter((x) => x.habitId === hb.id).forEach((x) => { db.habitLogs = db.habitLogs.filter((y) => y.id !== x.id); });   // el servidor los borra en cascada
+      remove("habits", hb.id);
+      if (state.habitSel === hb.id) state.habitSel = "";
+      closeSheet(); toast("Hábito eliminado"); render();
+    })),
+  );
+  openSheet(rec ? "Editar hábito" : "Nuevo hábito", form);
+}
+
+/** Sube o baja un hábito en la lista (el orden se usa en Hoy y en el calendario). */
+function moveHabit(hid, dir) {
+  const list = habitsSorted();
+  const i = list.findIndex((x) => x.id === hid), j = i + dir;
+  if (j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  list.forEach((x, k) => { if (x.position !== k) upsert("habits", { ...x, position: k }); });
+  render();
+}
+
+/** Tarjeta de Hoy: un toque marca el hábito; debajo, la semana y la racha. */
+function habitsCard() {
+  const list = habitsSorted(), t = todayISO();
+  const doneToday = list.filter((x) => habitDone(x.id, t)).length;
+  return h("section", { class: "card habits-card", "aria-label": "Hábitos de hoy" },
+    h("div", { class: "card-head" },
+      h("h2", {}, "Hábitos de hoy"),
+      list.length ? h("button", { type: "button", class: "link", onclick: () => go("habits") }, `${doneToday} de ${list.length} · Calendario`) : null),
+    list.length
+      ? h("ul", { class: "list habit-list" }, list.map((hb) => {
+          const on = habitDone(hb.id, t), streak = habitStreak(hb.id);
+          return h("li", { class: "habit-row", style: habitStyle(hb) },
+            h("button", { type: "button", class: "habit-check", "aria-pressed": String(on), "aria-label": `${hb.name}: ${on ? "hecho hoy, tocá para desmarcar" : "sin hacer, tocá para marcar"}`, icon: "check", onclick: () => toggleHabit(hb.id, t) }),
+            h("div", { class: "habit-info" },
+              h("span", { class: "habit-name" }, hb.name),
+              h("span", { class: "habit-week", "aria-hidden": "true" }, last7().map((d) => h("i", { class: `${habitDone(hb.id, d) ? "on" : ""}${d === t ? " today" : ""}` })))),
+            h("span", { class: "habit-streak num", title: "Racha de días seguidos" },
+              streak ? h("span", { class: "flame", icon: "flame" }) : null,
+              h("b", {}, String(streak)), h("small", {}, streak === 1 ? "día" : "días")));
+        }))
+      : h("div", { class: "habits-empty" },
+          h("p", { class: "muted" }, "Sumá hábitos para tacharlos cada día: estirar, sin alcohol, meditar, vitaminas…"),
+          h("button", { type: "button", class: "btn ghost block", icon: "plus", onclick: () => habitForm() }, "Crear hábito")));
+}
+
+function viewHabits() {
+  const list = habitsSorted(), t = todayISO();
+  if (!list.find((x) => x.id === state.habitSel)) state.habitSel = list[0]?.id || "";
+  const hb = list.find((x) => x.id === state.habitSel);
+  const off = state.habitMonth;
+  const first = parseDate(t); first.setDate(1); first.setMonth(first.getMonth() + off);
+  const daysIn = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const lead = (first.getDay() + 6) % 7;
+  const monthDates = Array.from({ length: daysIn }, (_, i) => iso(new Date(first.getFullYear(), first.getMonth(), i + 1)));
+  const elapsed = monthDates.filter((d) => d <= t);
+  const doneMonth = hb ? elapsed.filter((d) => habitDone(hb.id, d)).length : 0;
+
+  return [
+    bodyNav("habits"),
+    !list.length && h("section", { class: "card" },
+      emptyState("check", "Todavía no tenés hábitos", "Creá uno y tachá cada día que lo cumplas: se pinta con su color."),
+      h("button", { type: "button", class: "btn primary block", icon: "plus", onclick: () => habitForm() }, "Crear hábito")),
+    hb && h("section", { class: "card habit-cal", "aria-label": "Calendario del hábito", style: habitStyle(hb) },
+      h("div", { class: "habit-chips", role: "radiogroup", "aria-label": "Hábito" },
+        list.map((x) => h("button", { type: "button", class: "habit-chip", role: "radio", "aria-checked": String(x.id === hb.id), style: habitStyle(x), onclick: () => { state.habitSel = x.id; render(); } }, h("i"), x.name))),
+      h("div", { class: "month-head" },
+        h("strong", {}, capitalize(first.toLocaleDateString("es", { month: "long", year: "numeric" }))),
+        h("span", { class: "mnav" },
+          h("button", { type: "button", class: "icon-btn", icon: "left", "aria-label": "Mes anterior", onclick: () => { state.habitMonth--; render(); } }),
+          h("button", { type: "button", class: "icon-btn", icon: "right", "aria-label": "Mes siguiente", disabled: off >= 0, onclick: () => { state.habitMonth++; render(); } }))),
+      h("p", { class: "hint", style: "margin:-4px 0 8px" }, "Tocá un día para tacharlo o destacharlo."),
+      h("div", { class: "cal-dow", "aria-hidden": "true" }, ["L", "M", "M", "J", "V", "S", "D"].map((x) => h("span", {}, x))),
+      h("div", { class: "cal-grid" },
+        Array.from({ length: lead }, () => h("span", { class: "cal-day out", "aria-hidden": "true" })),
+        monthDates.map((d, i) => {
+          const done = habitDone(hb.id, d), future = d > t;
+          return h("button", {
+            type: "button", class: `cal-day${done ? " done" : ""}${d === t ? " today" : ""}`, disabled: future,
+            "aria-label": `${i + 1}: ${done ? "cumplido" : "sin cumplir"}`, "aria-pressed": String(done),
+            onclick: () => toggleHabit(hb.id, d),
+          }, String(i + 1));
+        })),
+      h("div", { class: "cal-kpis" },
+        h("div", {}, h("b", { class: "num" }, String(habitStreak(hb.id))), h("span", {}, "Racha actual")),
+        h("div", {}, h("b", { class: "num" }, String(habitBest(hb.id))), h("span", {}, "Mejor racha")),
+        h("div", {}, h("b", { class: "num" }, elapsed.length ? `${Math.round((doneMonth / elapsed.length) * 100)} %` : "—"), h("span", {}, off === 0 ? "En lo que va del mes" : "Del mes")))),
+    list.length > 0 && h("section", { class: "card", "aria-label": "Tus hábitos" },
+      h("div", { class: "card-head" }, h("h2", {}, "Tus hábitos"), h("span", { class: "muted" }, "tocá uno para editarlo")),
+      h("ul", { class: "list" }, list.map((x, i) => h("li", { class: "item habit-item", style: habitStyle(x) },
+        h("button", { type: "button", class: "item-btn", onclick: () => habitForm(x) },
+          h("span", { class: "habit-dot", "aria-hidden": "true" }),
+          h("span", { class: "item-main" },
+            h("span", { class: "item-title", style: "display:block" }, x.name),
+            h("span", { class: "item-sub num" }, `Racha ${habitStreak(x.id)} · mejor ${habitBest(x.id)}`))),
+        h("span", { class: "habit-order" },
+          h("button", { type: "button", class: "icon-btn", icon: "up", "aria-label": `Subir ${x.name}`, disabled: i === 0, onclick: () => moveHabit(x.id, -1) }),
+          h("button", { type: "button", class: "icon-btn", icon: "down", "aria-label": `Bajar ${x.name}`, disabled: i === list.length - 1, onclick: () => moveHabit(x.id, 1) })))))),
+    fab("Hábito", () => habitForm()),
+  ];
+}
+
 /* ============ plan semanal y lista de compras ============ */
 
 // hora por defecto al pasar una comida planificada al diario
@@ -1507,7 +1672,7 @@ function subnav(items, current, label) {
     }, text)));
 }
 const mealsNav = (v) => subnav([["meals", "Diario"], ["plan", "Semana"], ["recipes", "Recetas"]], v, "Comidas");
-const bodyNav = (v) => subnav([["body", "Peso y grasa"], ["sleep", "Sueño"]], v, "Cuerpo");
+const bodyNav = (v) => subnav([["body", "Peso y grasa"], ["sleep", "Sueño"], ["habits", "Hábitos"]], v, "Cuerpo");
 
 // ancho interior de una tarjeta, para dibujar los gráficos a su tamaño
 const chartWidth = () => Math.max(260, Math.min(640, viewEl.clientWidth) - 32 - 34);
@@ -1525,7 +1690,7 @@ function sleepItem(s) {
 
 /* ============ vistas ============ */
 
-const state = { view: "today", mealDate: todayISO(), planWeek: weekStart(todayISO()), period: "3m", recipeFilter: "all", sportFilter: "run" };
+const state = { view: "today", mealDate: todayISO(), planWeek: weekStart(todayISO()), period: "3m", recipeFilter: "all", sportFilter: "run", habitSel: "", habitMonth: 0 };
 
 const VIEWS = {
   today: { title: "Hoy", tab: "today", render: viewToday },
@@ -1535,6 +1700,7 @@ const VIEWS = {
   recipes: { title: "Recetas", tab: "meals", render: viewRecipes },
   body: { title: "Cuerpo", tab: "body", render: viewBody },
   sleep: { title: "Sueño", tab: "body", render: viewSleep },
+  habits: { title: "Hábitos", tab: "body", render: viewHabits },
   summary: { title: "Resumen", tab: "summary", render: viewSummary },
 };
 
@@ -1568,6 +1734,7 @@ function viewToday() {
         h("div", { class: "ring-item" },
           ring(lastSleep?.hours || 0, g.sleep, lastSleep ? fmt1(lastSleep.hours) : "—", "horas", { color: "sleep", size: "sm" }),
           h("div", {}, h("b", {}, "Sueño"), h("span", {}, avgSleep ? `media ${fmt1(avgSleep)} h` : "sin registros"))))),
+    habitsCard(),
     h("section", { class: "card", "aria-label": "Macros de hoy" },
       h("div", { class: "card-head" }, h("h2", {}, "Macros de hoy"), h("span", { class: "muted num" }, `${fmt0(kcal)} kcal`)),
       macroBar("p", "Proteína", sum(meals, "p"), g.p),
@@ -1955,7 +2122,7 @@ function viewSummary() {
   const months = bucketList(unit === "month" ? start : start.slice(0, 8) + "01", "month").reverse();
   const mRuns = groupBy(db.runs.filter(isRun), "month"), mMeals = groupBy(db.meals, "month"), mSleep = groupBy(db.sleep, "month"), mBody = groupBy([...db.body].sort(byDateAsc), "month");
 
-  const empty = !acts.length && !meals.length && !sleep.length && !body.length && !caf.length;
+  const empty = !acts.length && !meals.length && !sleep.length && !body.length && !caf.length && !db.habitLogs.some(inP);
   const cafBy = groupBy(caf, unit);
   const cafData = buckets.map((b) => {
     const list = cafBy.get(b.key) || [];
@@ -1964,6 +2131,18 @@ function viewSummary() {
     return { label: b.label, value: v, tip: `${capitalize(b.long)} · ${v ? `${fmt0(v)} mg/día` : "sin registros"}` };
   });
   const mCaf = groupBy(db.caffeine, "month");
+
+  // hábitos: % de días cumplidos desde el inicio del período (o desde la primera marca)
+  const tISO = todayISO();
+  const habitRates = habitsSorted().map((hb) => {
+    const logs = db.habitLogs.filter((x) => x.habitId === hb.id);
+    const first = logs.reduce((m, x) => (x.date < m ? x.date : m), tISO);
+    const from = first > start ? first : start;
+    const days = Math.round((parseDate(tISO) - parseDate(from)) / 864e5) + 1;
+    const done = logs.filter((x) => x.date >= from && x.date <= tISO).length;
+    return { hb, done, days, has: logs.length > 0, pct: logs.length ? Math.round((done / days) * 100) : 0 };
+  });
+  const habitTotal = habitRates.reduce((a, x) => [a[0] + x.done, a[1] + (x.has ? x.days : 0)], [0, 0]);
 
   return [
     h("div", { class: "seg period", role: "radiogroup", "aria-label": "Período" },
@@ -1988,7 +2167,18 @@ function viewSummary() {
         stat(bmi ? fmt1(bmi) : "—", "", "IMC", bmi ? capitalize(bmiLabel(bmi)) : null),
         stat(cafDays ? fmt0(sum(caf, "mg") / cafDays) : "—", "mg", "Cafeína por día", `Límite ${fmt0(g.caffeine)} mg`),
         stat(cafDays ? fmt1(termosOf(caf) / cafDays) : "—", "", "Termos de mate por día", cafDays ? `${fmt1(termosOf(caf))} en total` : null),
-        stat(fatList.length ? fmt1(fatList.at(-1).fat) : "—", "%", "Grasa corporal", fatList.length > 1 ? `${fmtDelta(fatList.at(-1).fat - fatList[0].fat, "pts")} en el período` : null))),
+        stat(fatList.length ? fmt1(fatList.at(-1).fat) : "—", "%", "Grasa corporal", fatList.length > 1 ? `${fmtDelta(fatList.at(-1).fat - fatList[0].fat, "pts")} en el período` : null),
+        habitRates.length > 0 && stat(habitTotal[1] ? fmt0((habitTotal[0] / habitTotal[1]) * 100) : "—", "%", "Hábitos cumplidos", `${habitTotal[0]} días tachados`))),
+
+    habitRates.some((x) => x.done) && h("section", { class: "card", "aria-label": "Hábitos del período" },
+      h("div", { class: "card-head" }, h("h2", {}, "Hábitos"), h("button", { type: "button", class: "link", onclick: () => go("habits") }, "Calendario")),
+      h("ul", { class: "list" }, habitRates.map(({ hb, done, days, has, pct }) => h("li", { class: "habit-rate habit-item", style: habitStyle(hb) },
+        h("div", { class: "habit-rate-top" },
+          h("span", { class: "habit-dot", "aria-hidden": "true" }),
+          h("span", { class: "habit-name" }, hb.name),
+          h("span", { class: "num muted" }, has ? `${done} de ${days} días · ` : "sin marcas · "),
+          h("b", { class: "num" }, `${pct} %`)),
+        h("div", { class: "habit-bar", role: "img", "aria-label": `${hb.name}: ${pct} %` }, h("i", { style: `width:${pct}%` })))))),
 
     h("section", { class: "card", "aria-label": `Kilómetros por ${per}` },
       h("div", { class: "card-head" }, h("h2", {}, `Km corriendo por ${per}`)),
@@ -2110,9 +2300,9 @@ window.addEventListener("hashchange", () => { if (account.user) go(location.hash
 
 /* ---------- deslizar entre pestañas internas ---------- */
 // en el mismo orden que se ven en pantalla
-const SWIPE_GROUPS = [["meals", "plan", "recipes"], ["body", "sleep"]];
+const SWIPE_GROUPS = [["meals", "plan", "recipes"], ["body", "sleep", "habits"]];
 // donde deslizar tiene otro uso (gráficos, tabla que se desplaza, controles)
-const NO_SWIPE = ".chart, .table-wrap, input, select, textarea, .tour";
+const NO_SWIPE = ".chart, .table-wrap, input, select, textarea, .tour, .habit-chips";
 let swipe = null;
 
 viewEl.addEventListener("touchstart", (e) => {

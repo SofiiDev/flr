@@ -18,11 +18,13 @@ const COLUMNS = {
   body_metrics: ["id", "date", "weight_kg", "body_fat_pct", "notes"],
   recipes: ["id", "name", "servings", "ingredients", "kcal", "p", "c", "f", "items", "caffeine_mg", "created_by", "updated_at"],
   caffeine: ["id", "date", "time", "kind", "amount", "yerba", "yerba_g", "description", "caffeine_mg", "recipe_id"],
+  habits: ["id", "name", "color", "position"],
+  habit_logs: ["id", "habit_id", "date"],
   meal_plan: ["id", "date", "slot", "recipe_id", "servings"],
   shopping_lists: ["id", "week_start", "sections", "updated_at"],
 };
 // con profile_id; las recetas son compartidas
-const OWNED = ["runs", "meals", "sleep", "body_metrics", "caffeine", "meal_plan", "shopping_lists"];
+const OWNED = ["runs", "meals", "sleep", "body_metrics", "caffeine", "habits", "habit_logs", "meal_plan", "shopping_lists"];
 const PROFILE_FIELDS = ["goals", "height_cm", "prefs"];
 
 const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => obj?.[k] !== undefined).map((k) => [k, obj[k]]));

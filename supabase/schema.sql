@@ -147,6 +147,25 @@ create table if not exists public.caffeine (
 create index if not exists caffeine_profile_date on public.caffeine (profile_id, date);
 alter table public.caffeine add column if not exists recipe_id uuid references public.recipes (id) on delete set null;
 
+-- ---------- Hábitos y días cumplidos ----------
+create table if not exists public.habits (
+  id         uuid primary key default gen_random_uuid(),
+  profile_id text not null references public.profiles (id) on delete cascade,
+  name       text not null check (length(name) between 1 and 60),
+  color      text not null default 'rosa',
+  position   integer not null default 0,
+  created_at timestamptz not null default now()
+);
+create table if not exists public.habit_logs (
+  id         uuid primary key default gen_random_uuid(),
+  profile_id text not null references public.profiles (id) on delete cascade,
+  habit_id   uuid not null references public.habits (id) on delete cascade,
+  date       date not null,
+  created_at timestamptz not null default now(),
+  unique (habit_id, date)
+);
+create index if not exists habit_logs_profile_date on public.habit_logs (profile_id, date);
+
 -- ---------- Plan semanal: qué receta se come cada día ----------
 create table if not exists public.meal_plan (
   id         uuid primary key default gen_random_uuid(),
@@ -187,12 +206,14 @@ alter table public.meals         enable row level security;
 alter table public.sleep         enable row level security;
 alter table public.body_metrics  enable row level security;
 alter table public.caffeine      enable row level security;
+alter table public.habits        enable row level security;
+alter table public.habit_logs    enable row level security;
 alter table public.meal_plan     enable row level security;
 alter table public.shopping_lists enable row level security;
 alter table public.strava_tokens enable row level security;
 
 revoke all on public.profiles, public.runs, public.recipes, public.meals, public.sleep,
-  public.body_metrics, public.caffeine, public.meal_plan, public.shopping_lists, public.strava_tokens from anon, authenticated;
+  public.body_metrics, public.caffeine, public.habits, public.habit_logs, public.meal_plan, public.shopping_lists, public.strava_tokens from anon, authenticated;
 
 -- que la API de Supabase vea las tablas nuevas sin esperar
 notify pgrst, 'reload schema';

@@ -101,6 +101,12 @@ const clean = {
     yerbaG: x.yerbaG == null || x.yerbaG === "" || !num(x.yerbaG) ? null : num(x.yerbaG, 1, 1000),
     desc: str(x.desc, 1000), mg: Math.round(num(x.mg, 0, 5000)), recipeId: str(x.recipeId, 40),
   },
+  habits: (x) => x && str(x.name, 60).trim() && {
+    id: id(x.id), name: str(x.name, 60).trim(), color: str(x.color, 20) || "rosa", position: Math.round(num(x.position, 0, 1000)),
+  },
+  habitLogs: (x) => isDate(x?.date) && typeof x.habitId === "string" && x.habitId && {
+    id: id(x.id), habitId: str(x.habitId, 40), date: x.date,
+  },
   plan: (x) => isDate(x?.date) && typeof x.recipeId === "string" && x.recipeId && {
     id: id(x.id), date: x.date, slot: str(x.slot, 20) || "comida",
     recipeId: str(x.recipeId, 40), servings: num(x.servings, 0.25, 100) || 1,
@@ -150,6 +156,8 @@ const fromRow = {
   sleep: (s) => s,
   body: (b) => ({ ...b, weight: b.weight_kg, fat: b.body_fat_pct }),
   caffeine: (x) => ({ ...x, yerbaG: x.yerba_g, desc: x.description, mg: x.caffeine_mg, recipeId: x.recipe_id || "" }),
+  habits: (x) => x,
+  habitLogs: (x) => ({ ...x, habitId: x.habit_id }),
   plan: (x) => ({ ...x, recipeId: x.recipe_id }),
   shopping: (x) => ({ ...x, weekStart: x.week_start }),
 };
@@ -169,15 +177,17 @@ const toRow = {
   sleep: (s) => ({ id: s.id, date: s.date, bed: s.bed, wake: s.wake, hours: s.hours, quality: s.quality, notes: s.notes }),
   body: (b) => ({ id: b.id, date: b.date, weight_kg: b.weight, body_fat_pct: b.fat, notes: b.notes }),
   caffeine: (x) => ({ id: x.id, date: x.date, time: x.time, kind: x.kind, amount: x.amount, yerba: x.yerba, yerba_g: x.yerbaG, description: x.desc, caffeine_mg: x.mg, recipe_id: x.recipeId || null }),
+  habits: (x) => ({ id: x.id, name: x.name, color: x.color, position: x.position }),
+  habitLogs: (x) => ({ id: x.id, habit_id: x.habitId, date: x.date }),
   plan: (x) => ({ id: x.id, date: x.date, slot: x.slot, recipe_id: x.recipeId, servings: x.servings }),
   shopping: (x) => ({ id: x.id, week_start: x.weekStart, sections: x.sections, updated_at: new Date().toISOString() }),
 };
 
-const COLLECTIONS = ["runs", "meals", "recipes", "sleep", "body", "caffeine", "plan", "shopping"];
+const COLLECTIONS = ["runs", "meals", "recipes", "sleep", "body", "caffeine", "habits", "habitLogs", "plan", "shopping"];
 // nombre de la tabla en Supabase de cada colección
-const TABLE = { runs: "runs", meals: "meals", recipes: "recipes", sleep: "sleep", body: "body_metrics", caffeine: "caffeine", plan: "meal_plan", shopping: "shopping_lists" };
+const TABLE = { runs: "runs", meals: "meals", recipes: "recipes", sleep: "sleep", body: "body_metrics", caffeine: "caffeine", habits: "habits", habitLogs: "habit_logs", plan: "meal_plan", shopping: "shopping_lists" };
 
-export const db = { runs: [], meals: [], recipes: [], sleep: [], body: [], caffeine: [], plan: [], shopping: [], goals: { ...DEFAULT_GOALS } };
+export const db = { runs: [], meals: [], recipes: [], sleep: [], body: [], caffeine: [], habits: [], habitLogs: [], plan: [], shopping: [], goals: { ...DEFAULT_GOALS } };
 export const account = { user: null, profile: null, people: [], loadedAt: 0 };
 
 /* ---------- carga ---------- */
@@ -259,17 +269,20 @@ export function exportJSON() {
 /** Importa una copia (también la de la versión local de FlorLovesRunning) como registros nuevos. */
 export async function importJSON(text) {
   const raw = JSON.parse(text);
-  const recipeIds = new Map();
+  const recipeIds = new Map(), habitIds = new Map();
   const fresh = (c, list) => (Array.isArray(list) ? list : []).map((x) => {
     const rec = clean[c]({ ...x, id: undefined });
     if (rec && c === "recipes") recipeIds.set(x.id, rec.id);
     if (rec && c === "meals") rec.recipeId = recipeIds.get(x.recipeId) || "";
     if (rec && c === "plan") rec.recipeId = recipeIds.get(x.recipeId) || "";   // sin su receta, se descarta
     if (rec && c === "caffeine") rec.recipeId = recipeIds.get(x.recipeId) || "";
+    if (rec && c === "habits") habitIds.set(x.id, rec.id);
+    if (rec && c === "habitLogs") rec.habitId = habitIds.get(x.habitId) || "";
+    if (c === "habitLogs" && !rec?.habitId) return null;
     return c === "plan" && !rec?.recipeId ? null : rec;
   }).filter(Boolean);
 
-  for (const c of ["recipes", "runs", "meals", "sleep", "body", "caffeine", "plan"]) {
+  for (const c of ["recipes", "runs", "meals", "sleep", "body", "caffeine", "habits", "habitLogs", "plan"]) {
     const list = fresh(c, raw[c]);
     for (let i = 0; i < list.length; i += 500) {
       await call("insert", { table: TABLE[c], rows: list.slice(i, i + 500).map(toRow[c]) });
