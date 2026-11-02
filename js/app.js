@@ -1005,9 +1005,13 @@ function caffeineForm(rec, preset = {}) {
     ai.disabled = true; ai.lastChild.textContent = "Calculando…"; status.textContent = ""; note.textContent = "";
     try {
       const k = kindNow();
-      const data = await api("/api/caffeine", { kind: k, amount: readNum(amount) || 1, yerba: yerba.value, yerba_g: readNum(yerbaG), description: desc.value });
+      const r = recipeById(recipeSel.value);
+      const n = readNum(amount) || 1;
+      const description = [r && `Receta «${r.name}» (rinde ${fmt1(r.servings)} ${r.servings === 1 ? "porción" : "porciones"}; tomé ${fmt1(n)}). Ingredientes de la receta completa: ${r.ingredients || "no cargados"}`, desc.value].filter(Boolean).join(". ");
+      const data = await api("/api/caffeine", { kind: k, amount: n, yerba: yerba.value, yerba_g: readNum(yerbaG), description });
       mg.value = String(data.caffeine_mg); mgTouched = true;
       note.textContent = data.notes || "";
+      saveCafRow.hidden = !(r && !(r.caf > 0));
     } catch (err) {
       status.textContent = err.message;
     } finally {
@@ -1015,19 +1019,32 @@ function caffeineForm(rec, preset = {}) {
     }
   });
 
-  // recetas con cafeína (mi café con leche, mi mate de siempre…)
-  const cafRecipes = db.recipes.filter((r) => r.caf > 0).sort((a, b) => a.name.localeCompare(b.name, "es"));
+  // todas las recetas: primero las que ya tienen la cafeína cargada (mi café con leche, mi mate de siempre…)
+  const byName = (a, b) => a.name.localeCompare(b.name, "es");
+  const withCaf = db.recipes.filter((r) => r.caf > 0).sort(byName);
+  const withoutCaf = db.recipes.filter((r) => !(r.caf > 0)).sort(byName);
+  const cafRecipes = [...withCaf, ...withoutCaf];
   const recipeSel = h("select", { name: "recipe" },
     h("option", { value: "" }, "— Ninguna —"),
-    cafRecipes.map((r) => h("option", { value: r.id, selected: r.id === x.recipeId }, `${r.name} · ${fmt0(r.caf / r.servings)} mg por porción`)));
+    withCaf.length > 0 && h("optgroup", { label: "Con cafeína" },
+      withCaf.map((r) => h("option", { value: r.id, selected: r.id === x.recipeId }, `${r.name} · ${fmt0(r.caf / r.servings)} mg por porción`))),
+    withoutCaf.length > 0 && h("optgroup", { label: "Sin cafeína cargada" },
+      withoutCaf.map((r) => h("option", { value: r.id, selected: r.id === x.recipeId }, r.name))));
   const addKcal = h("input", { type: "checkbox", name: "addKcal", checked: !rec });
   const kcalRow = h("label", { class: "check-line", hidden: true }, addKcal, h("span", {}, ""));
+  // si la receta no tenía cafeína y la calcula la IA, se puede guardar en la receta
+  const saveCaf = h("input", { type: "checkbox", name: "saveCaf", checked: true });
+  const saveCafRow = h("label", { class: "check-line", hidden: true }, saveCaf, h("span", {}, "Guardar esta cafeína en la receta para la próxima vez"));
+  const recipeHint = h("p", { class: "hint recipe-hint", style: "margin:-8px 0 16px" });
   const applyRecipe = () => {
     const r = recipeById(recipeSel.value);
     kcalRow.hidden = !r || !r.kcal || Boolean(rec);
+    recipeHint.textContent = "";
+    saveCafRow.hidden = true;
     if (!r) return;
     const n = readNum(amount) || 1;
-    mg.value = String(Math.round((r.caf / r.servings) * n)); mgTouched = true;
+    if (r.caf > 0) { mg.value = String(Math.round((r.caf / r.servings) * n)); mgTouched = true; }
+    else if (!rec) { mg.value = ""; mgTouched = false; recipeHint.textContent = "Esta receta no tiene la cafeína cargada: tocá «Calcular cafeína con IA» y la calculamos con sus ingredientes."; }
     kcalRow.lastChild.textContent = `Sumar también sus calorías al diario (${fmt0((r.kcal / r.servings) * n)} kcal)`;
     const guess = /yerba|mate/i.test(r.name) ? "mate" : /caf[eé]/i.test(r.name) ? "cafe" : /\bt[eé]\b/i.test(r.name) ? "te" : null;
     if (guess && !rec) { const radio = form.querySelector(`input[name="kind"][value="${guess}"]`); if (radio) radio.checked = true; refresh(); }
@@ -1040,6 +1057,9 @@ function caffeineForm(rec, preset = {}) {
     const n = readNum(amount) || 1;
     const value = mgTouched && mg.value.trim() !== "" ? readNum(mg) : quickCaffeine(k, n, readNum(yerbaG));
     const r = recipeById(recipeSel.value);
+    if (r && !(r.caf > 0) && !saveCafRow.hidden && saveCaf.checked && value > 0) {
+      upsert("recipes", { ...r, caf: (value / n) * r.servings });   // cafeína de la receta completa
+    }
     upsert("caffeine", {
       id: x.id || uid(), date: date.value || todayISO(), time: time.value || nowTime(), kind: k, amount: n,
       yerba: k === "mate" ? yerba.value.trim() : "", yerbaG: k === "mate" ? readNum(yerbaG) || null : null,
@@ -1059,12 +1079,13 @@ function caffeineForm(rec, preset = {}) {
     h("div", { class: "field" }, h("span", { class: "label" }, "Qué tomaste"),
       segmented("kind", CAFFEINE_KINDS.map((k) => [k, KIND_INFO[k][0]]), x.kind, "Tipo de bebida")),
     h("div", { class: "row" }, field("Fecha", date), field("Hora", time)),
-    cafRecipes.length > 0 && field("Desde una receta", recipeSel, "Tus recetas con cafeína: elegila y se carga sola."),
+    cafRecipes.length > 0 && field("Desde una receta", recipeSel, "Elegí tu receta (café con leche, tu mate de siempre…) y se carga sola."),
+    recipeHint,
     h("div", { class: "field" }, amountLabel, amount),
     kcalRow,
     mateFields,
     field("Detalle (opcional)", desc),
-    h("div", { class: "ai-box" }, ai, note, status),
+    h("div", { class: "ai-box" }, ai, note, status, saveCafRow),
     field("Cafeína (mg)", mg, "Calculala con IA o escribila. Si la dejás vacía, usamos la estimación que ves en gris."),
     rec && !x.recipeId && h("button", {
       type: "button", class: "btn ghost block", icon: "recipes", style: "margin-bottom:12px",
