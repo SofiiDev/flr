@@ -168,6 +168,7 @@ const toRow = {
   recipes: (r) => ({
     id: r.id, name: r.name, servings: r.servings, ingredients: r.ingredients,
     kcal: r.kcal, p: r.p, c: r.c, f: r.f, items: r.items, caffeine_mg: r.caf, updated_at: new Date().toISOString(),
+    ...(r.owner ? { created_by: r.owner } : {}),
   }),
   sleep: (s) => ({ id: s.id, date: s.date, bed: s.bed, wake: s.wake, hours: s.hours, quality: s.quality, notes: s.notes }),
   body: (b) => ({ id: b.id, date: b.date, weight_kg: b.weight, body_fat_pct: b.fat, notes: b.notes }),

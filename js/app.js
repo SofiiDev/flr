@@ -485,12 +485,14 @@ function recipeForm(rec) {
     const saved = upsert("recipes", {
       id: r.id || uid(), name: name.value.trim(), servings: readNum(servings) || 1,
       ingredients: ai.querySelector("textarea").value.trim() || ingredients, items,
-      ...v, kcal: v.kcal || kcalFromMacros(v.p, v.c, v.f), caf: readNum(caf), owner: r.owner || account.user.id,
+      ...v, kcal: v.kcal || kcalFromMacros(v.p, v.c, v.f), caf: readNum(caf), owner: checked(form, "owner") || r.owner || account.user.id,
     });
     closeSheet(); toast(rec ? "Receta actualizada" : "Receta guardada"); render();
     return saved;
   },
     field("Nombre", name),
+    account.people.length > 1 && h("div", { class: "field" }, h("span", { class: "label" }, "De quién es"),
+      segmented("owner", account.people.map((x) => [x.id, x.name]), r.owner || account.user.id, "Dueña de la receta")),
     field("Porciones", servings),
     ai,
     h("p", { class: "eyebrow", style: "margin-bottom:8px" }, "Total de la receta"),

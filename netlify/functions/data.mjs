@@ -8,7 +8,7 @@
      wipe                         → borra todos los registros del perfil (no las recetas)
    El perfil sale siempre del token de sesión, nunca del cuerpo de la petición. */
 
-import { json, sameOrigin, sessionProfile, supabaseAdmin, explainDbError, ConfigError } from "../lib/server.mjs";
+import { json, sameOrigin, sessionProfile, supabaseAdmin, explainDbError, isProfile, ConfigError } from "../lib/server.mjs";
 
 // columnas que el navegador puede escribir en cada tabla
 const COLUMNS = {
@@ -16,7 +16,7 @@ const COLUMNS = {
   meals: ["id", "date", "time", "slot", "name", "kcal", "p", "c", "f", "recipe_id", "servings", "items", "description"],
   sleep: ["id", "date", "bed", "wake", "hours", "quality", "notes"],
   body_metrics: ["id", "date", "weight_kg", "body_fat_pct", "notes"],
-  recipes: ["id", "name", "servings", "ingredients", "kcal", "p", "c", "f", "items", "caffeine_mg", "updated_at"],
+  recipes: ["id", "name", "servings", "ingredients", "kcal", "p", "c", "f", "items", "caffeine_mg", "created_by", "updated_at"],
   caffeine: ["id", "date", "time", "kind", "amount", "yerba", "yerba_g", "description", "caffeine_mg", "recipe_id"],
   water: ["id", "date", "time", "ml"],
   meal_plan: ["id", "date", "slot", "recipe_id", "servings"],
@@ -51,11 +51,13 @@ export default async (req) => {
           if (existing && existing.profile_id !== profile) throw new Forbidden("Ese registro no es de tu perfil");
         }
         clean.profile_id = profile;
-      } else if (!checkOwner) {
-        clean.created_by = profile;
-      } else if (clean.id) {
-        const existing = must(await db.from(table).select("id").eq("id", clean.id).maybeSingle());
-        if (!existing) clean.created_by = profile;   // receta nueva: queda a nombre de quien la crea
+      } else {
+        // recetas: dueña elegida en la app (Sofi o Flor); si no viene, queda a nombre de quien la crea
+        if (clean.created_by !== undefined && !isProfile(clean.created_by)) delete clean.created_by;
+        if (clean.created_by === undefined) {
+          const existing = checkOwner && clean.id ? must(await db.from(table).select("id").eq("id", clean.id).maybeSingle()) : null;
+          if (!existing) clean.created_by = profile;
+        }
       }
       return clean;
     };
