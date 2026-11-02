@@ -5,6 +5,9 @@
 import { db, account, session, setSession, api, SessionExpired, CAFFEINE_KINDS, HABIT_KINDS, loadAll, upsert, remove, setGoals, setHeight, setPrefs, cleanPrefs, ACCENTS, exportJSON, importJSON, wipe, uid, flush, onWriteError } from "./store.js";
 import { barChart, lineChart } from "./charts.js";
 
+// cambiala en cada actualización: se ve en Ajustes para saber si el celular ya tiene la última
+const APP_VERSION = "2026.11.02-4";
+
 /* ============ utilidades ============ */
 
 // Solo para iconos constantes del propio código: nunca datos del usuario.
@@ -927,7 +930,8 @@ function settingsSheet() {
       catch { toast("No se pudieron borrar. Probá de nuevo."); }
     }, "btn danger block wipe"),
     h("p", { class: "hint", style: "margin-top:24px" },
-      "Las estimaciones de la IA son aproximadas: revísalas y ajústalas si conoces los valores exactos de la etiqueta."),
+      "Las estimaciones de la IA son aproximadas: revisalas y ajustalas si conocés los valores exactos de la etiqueta."),
+    h("p", { class: "hint", style: "margin-top:8px" }, `Versión ${APP_VERSION}`),
   );
   openSheet("Ajustes", form);
 }
@@ -2546,6 +2550,17 @@ boot();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(() => { /* opcional */ });
+    navigator.serviceWorker.register("sw.js", { scope: "./" })
+      .then((reg) => document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); }))
+      .catch(() => { /* opcional */ });
+  });
+  // cuando llega una versión nueva de la app, recarga sola (salvo que haya un formulario abierto)
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloaded) return;
+    const reload = () => { if (!reloaded && !document.getElementById("sheet")?.open) { reloaded = true; location.reload(); } };
+    reload();
+    if (!reloaded) document.addEventListener("visibilitychange", reload);
   });
 }

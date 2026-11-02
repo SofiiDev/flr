@@ -2,7 +2,7 @@
    Red primero para que las actualizaciones lleguen enseguida;
    si no hay conexión se sirve la copia en caché (funciona offline). */
 
-const CACHE = "flr-v2";
+const CACHE = "flr-v3";
 const ASSETS = [
   "./",
   "index.html",
@@ -38,7 +38,8 @@ self.addEventListener("fetch", (e) => {
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/.netlify/")) return;
 
   e.respondWith(
-    fetch(e.request)
+    // no-cache: siempre pregunta al servidor si hay una versión nueva (nada de copias viejas del navegador)
+    fetch(e.request, { cache: "no-cache" })
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();
